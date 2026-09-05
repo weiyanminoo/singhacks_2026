@@ -76,6 +76,8 @@ async def context():
         "template": tpl["name"],
         "verticals_available": templates.available(),
         "profile": {"id": prof["id"], "name": prof["name"], "org": prof.get("org")},
+        "event": prof.get("event", {}),
+        "constraints": prof.get("constraints", {}),
         "envelope": prof["envelope"],
         "notes": profiles.personalisation_notes(prof),
         "providers": [{"id": p["id"], "name": p["name"], "category": p["category"]}
