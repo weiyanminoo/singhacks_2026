@@ -25,26 +25,33 @@ before you take off. A fallback designated in advance, funded in advance.*
 
 <!-- Keep this near the top. Honesty reads as confidence. -->
 
-**Real:** every XRPL transaction, on Testnet. The money is **genuine RLUSD** —
-Ripple's testnet stablecoin, issuer `rQhWct2fv4Vc4KRjRgMrxa8xPN9Zx9iLKV`, held on
-real trust lines. Also real: the x402 payment flow, the agent's decisions, the
-policy engine, the spending controls, the failure recovery.
+**Real:** every XRPL transaction, on Testnet. Agent purchases are signed,
+submitted and validated on ledger, each carrying `SourceTag: 4021` and a memo
+resolving to the decision that caused it and the policy rule that permitted it.
+The x402 gating is real: an unpaid request to any supplier returns a genuine 402.
+Also real: the trigger loop, the agent's decisions, the policy engine, the
+spending controls.
 
 **Simulated:** the vendors. Eight mock providers with genuinely different pricing,
 inventory and latency. Travel API sandbox approval takes days and we had 24 hours.
 Integration path in [Beyond the prototype](#beyond-the-prototype).
 
-**Scaled:** the demo runs a **$10 envelope, not $400**. The public testnet RLUSD
-faucet dispenses 10 RLUSD per 24 hours, so a larger envelope cannot be funded with
-real RLUSD — and we chose authentic RLUSD at small scale over a self-issued token
-at large scale. Every amount on the explorer is real.
+**Settled in XRP, not RLUSD — and here is why, because we tried.** We set RLUSD
+trust lines on all nine accounts (real, on ledger, hashes in
+[TRANSACTIONS.md](TRANSACTIONS.md)) and imported the session wallet into a
+browser wallet on Testnet. The public testnet RLUSD faucet still never dispensed:
+it is wallet-connect only with no address field, hung on a trust line that
+already existed and it could not detect, then failed with a generic
+`PREPARATION ERROR`. Nothing reached the ledger; audited balances show 0.00 RLUSD
+across all ten accounts. XRP needs no trust line and x402 supports it natively,
+so the mechanics are identical and the demo no longer depends on a faucet we do
+not control. The trust lines stay in place as evidence. See `docs/00-decisions.md`
+D-016.
 
-**Purchases** are scaled 1/40 ($4.60 flight, $1.95 hotel, $0.49 transfer).
-**Discovery is not scaled** — it stays at its real price of **$0.02 per query**,
-$0.14 across 7 providers, because the cost of a data query does not shrink because
-the trip is smaller. So the discovery figure you see in the trace is the same one
-used in the unit economics under [Beyond the prototype](#beyond-the-prototype).
-See `docs/00-decisions.md` D-009 and D-012.
+**On the numbers:** the UI renders a `$` sign for legibility, but the ledger moves
+**XRP**. A 10 XRP envelope is not ten dollars and we do not claim it is. Purchases
+are scaled 1/40; discovery is unscaled at 0.02 per query, because the cost of a
+data query does not shrink because the trip is smaller (D-009, D-012).
 
 **Not built:** conditional escrow. `TokenEscrow` is an enabled amendment, but
 locking an issued token also requires the *issuer* to set
@@ -122,9 +129,9 @@ in [Failure handling](#failure-handling). See D-011.
 
 | What | XRPL feature | Why |
 |---|---|---|
-| Spending ceiling | Session wallet's RLUSD trust line balance | The limit is the balance, not a code check |
-| Discovery queries | `Payment` (RLUSD) ×7 | Sub-cent purchases card rails cannot process |
-| Purchases | `Payment` (RLUSD) ×3 | Dollar-denominated, instant final settlement |
+| Spending ceiling | Session wallet's XRP balance | The limit is the balance, not a code check |
+| Discovery queries | x402-gated `Payment` (XRP) ×7 | Micropayments card rails cannot process |
+| Purchases | `Payment` (XRP) ×3 | Instant final settlement, memo-linked to the decision |
 | Concurrent settlement | `TicketCreate` + `TicketSequence` | 7 discovery payments in one ledger close, not seven |
 | Audit trail | `Memos` + `SourceTag` | Every tx maps to a decision and a policy rule |
 | Refund on failure | `Payment` (RLUSD, vendor → session) | Money returns when the hotel sells out |
