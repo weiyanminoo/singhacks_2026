@@ -12,7 +12,9 @@ import yaml
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 VERTICALS = ROOT / "verticals"
 
-REQUIRED = ("id", "name", "triggers", "steps", "discovery", "caps", "scoring")
+# A playbook has either top-level `steps` (single recovery path) or `plans`
+# (competing recovery paths, each with its own steps). Both shapes are valid.
+REQUIRED = ("id", "name", "triggers", "discovery", "caps", "scoring")
 
 
 class TemplateError(ValueError):
@@ -37,26 +39,41 @@ def validate(tpl: dict) -> None:
     if missing:
         raise TemplateError(f"template missing keys: {', '.join(missing)}")
 
-    ids = [s["id"] for s in tpl["steps"]]
-    if len(ids) != len(set(ids)):
-        raise TemplateError("duplicate step ids")
+    if "steps" not in tpl and "plans" not in tpl:
+        raise TemplateError("template needs either 'steps' or 'plans'")
 
-    seen: set[str] = set()
-    for step in tpl["steps"]:
-        for key in ("id", "category"):
-            if key not in step:
-                raise TemplateError(f"step {step.get('id', '?')} missing '{key}'")
-        for dep in step.get("depends_on", []):
-            if dep not in seen:
-                raise TemplateError(
-                    f"step '{step['id']}' depends on '{dep}', which is not defined "
-                    "before it — steps are executed in order"
-                )
-        seen.add(step["id"])
+    if "plans" in tpl:
+        pids = [p["id"] for p in tpl["plans"]]
+        if len(pids) != len(set(pids)):
+            raise TemplateError("duplicate plan ids")
+        if not any(p.get("steps") for p in tpl["plans"]):
+            raise TemplateError("at least one plan must have steps to execute")
+        for plan in tpl["plans"]:
+            _validate_steps(plan.get("steps", []), where=f"plan '{plan['id']}'")
+
+    _validate_steps(tpl.get("steps", []), where="template")
 
     caps = tpl["caps"]
     if "envelope" not in caps:
         raise TemplateError("caps.envelope is required — it is the spending ceiling")
+
+
+def _validate_steps(steps: list[dict], *, where: str) -> None:
+    ids = [s["id"] for s in steps]
+    if len(ids) != len(set(ids)):
+        raise TemplateError(f"duplicate step ids in {where}")
+    seen: set[str] = set()
+    for step in steps:
+        for key in ("id", "category"):
+            if key not in step:
+                raise TemplateError(f"{where}: step {step.get('id', '?')} missing '{key}'")
+        for dep in step.get("depends_on", []):
+            if dep not in seen:
+                raise TemplateError(
+                    f"{where}: step '{step['id']}' depends on '{dep}', which is not "
+                    "defined before it — steps are executed in order"
+                )
+        seen.add(step["id"])
 
 
 def matches(tpl: dict, event: dict) -> bool:

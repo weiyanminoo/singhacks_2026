@@ -73,9 +73,20 @@ def check_constraints(option: dict, constraints: dict) -> tuple[bool, list[str]]
                     failures.append(f"{field} {got} is before {want}")
         elif key.startswith("max_"):
             field = key[4:]
-            got = attrs.get(field)
+            got = attrs.get(field) if field != "price" else option.get("price")
             if got is not None and _num(got) > _num(want):
                 failures.append(f"{field} {got} exceeds {want}")
+        elif key.startswith("min_"):
+            field = key[4:]
+            got = attrs.get(field)
+            if got is not None and _num(got) < _num(want):
+                failures.append(f"{field} {got} is below the required {want}")
+        elif key.startswith("requires_"):
+            # Boolean capability: the option must advertise it as true.
+            field = key[len("requires_"):]
+            if str(want).lower() in ("true", "1", "yes"):
+                if not attrs.get(field):
+                    failures.append(f"{field.replace('_', ' ')} not available")
     return (not failures), failures
 
 

@@ -1,0 +1,73 @@
+# Provider registry — Singapore event recovery.
+#
+# Six+ providers, none hardcoded into the workflow. The agent discovers and pays
+# for what it queries. Two venues are engineered to be rejected for different
+# reasons, and one supplier is engineered to fail, so the demo shows real
+# reasoning rather than a single obvious winner.
+
+providers:
+  # --- venues ---
+  - id: marina_hall
+    name: Marina Hall
+    category: venue
+    endpoint: /venue/marina-hall
+    price: "0.02"
+    reliability: 0.00           # the flooded original
+    wallet_role: flights_skyline
+
+  - id: suntec_backup
+    name: Suntec Backup Hall
+    category: venue
+    endpoint: /venue/suntec-backup
+    price: "0.02"
+    reliability: 0.95
+    wallet_role: flights_aeroconnect
+
+  - id: expo_venue_c
+    name: Expo Venue C
+    category: venue
+    endpoint: /venue/expo-c
+    price: "0.02"
+    reliability: 0.90
+    wallet_role: hotels_aurora
+
+  - id: city_ballroom
+    name: City Ballroom
+    category: venue
+    endpoint: /venue/city-ballroom
+    price: "0.02"
+    reliability: 0.92
+    wallet_role: hotels_transit_inn
+
+  # --- services ---
+  - id: av_supplier_a
+    name: AV Supplier A
+    category: av
+    endpoint: /av/supplier-a
+    price: "0.02"
+    reliability: 0.94
+    wallet_role: hotels_meridian
+
+  - id: av_supplier_b
+    name: AV Supplier B
+    category: av
+    endpoint: /av/supplier-b
+    price: "0.02"
+    reliability: 0.55           # cheaper, but fails — triggers the backup path
+    wallet_role: ground_swiftcar
+
+  - id: catering_a
+    name: Catering Supplier A
+    category: catering
+    endpoint: /catering/supplier-a
+    price: "0.02"
+    reliability: 0.93
+    wallet_role: ground_metrolink
+
+  - id: transport_a
+    name: Transport Supplier A
+    category: transport
+    endpoint: /transport/supplier-a
+    price: "0.02"
+    reliability: 0.60           # road closures
+    wallet_role: data_status

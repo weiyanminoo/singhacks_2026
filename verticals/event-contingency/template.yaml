@@ -1,0 +1,123 @@
+# Contingency playbook — event venue failure (ContingencyOS, D-018).
+#
+# NEW in this vertical: a `plans:` layer above `steps:`. The engine first compares
+# whole recovery plans on total expected cost, rejects infeasible ones, then
+# executes the winning plan's steps using the existing step machinery.
+#
+# All S$ figures are business-layer only. They appear in the UI and in transaction
+# memos. They are NEVER the on-ledger amount — settlement is nominal XRP (D-018).
+
+id: event-contingency
+name: Event venue failure recovery
+version: 1
+
+triggers:
+  - event_type: venue.unusable
+  - event_type: venue.degraded
+    when: "payload.capacity_lost_pct >= 50"
+
+objective: >
+  Deliver {profile.event.name} for {profile.event.attendees} attendees on
+  {profile.event.date}, or refund, within S${profile.envelope.limit} and all
+  organizer constraints.
+
+# --- Recovery plans, compared before anything is bought --------------------
+# `effects` are what the plan does to the world; the organizer's constraints
+# decide whether that is acceptable. The engine never knows what "postpone"
+# means — it compares effects against constraints.
+plans:
+  - id: cancel
+    label: Cancel and refund attendees
+    effects:
+      preserves_event: false
+      preserves_deadline: true
+    costs:
+      attendee_refunds: 150000
+      exhibitor_refunds: 70000
+      supplier_penalties: 25000
+
+  - id: postpone
+    label: Postpone to a later date
+    effects:
+      preserves_event: true
+      preserves_deadline: false      # this is what disqualifies it
+    costs:
+      venue_penalty: 20000
+      speaker_rebooking: 15000
+      attendee_churn_risk: 30000
+
+  - id: relocate
+    label: Relocate to a replacement venue
+    effects:
+      preserves_event: true
+      preserves_deadline: true
+    costs: {}                        # derived from what the steps actually buy
+    steps:
+      - id: replacement_venue
+        category: venue
+        required: true
+        depends_on: []
+        cap_key: venue
+        constraints:
+          min_capacity: "{profile.constraints.min_capacity}"
+          requires_public_transport: "{profile.constraints.public_transport_required}"
+          requires_av_support: true
+          max_price: "{profile.constraints.max_venue_cost}"
+
+      - id: av
+        category: av
+        required: true
+        depends_on: [replacement_venue]
+        cap_key: av
+        constraints:
+          max_price: "{profile.constraints.max_av_cost}"
+
+      - id: catering
+        category: catering
+        required: false
+        depends_on: [replacement_venue]
+        cap_key: catering
+        constraints:
+          max_price: "{profile.constraints.max_catering_cost}"
+
+      - id: transport
+        category: transport
+        required: false
+        depends_on: [replacement_venue]
+        cap_key: transport
+        constraints: {}
+
+# --- Paid verification (x402) ---------------------------------------------
+# Real XRP micropayments on testnet. Separate budget from settlement (D-018).
+discovery:
+  categories: [venue, transport, av, catering]
+  price_per_query: "0.02"          # XRP, real
+  price_display: "S$250"           # what a verification service would cost
+  max_queries: 7
+  budget_xrp: "2.0"
+
+# --- Spending controls, business layer (S$) -------------------------------
+caps:
+  envelope: "80000"
+  approval_threshold: "10000"      # per transaction
+  per_category:
+    venue: "50000"
+    av: "15000"
+    catering: "15000"
+    transport: "12000"
+
+# --- Settlement, ledger layer ---------------------------------------------
+# Nominal XRP per settlement transaction. The true S$ amount rides in the memo.
+settlement:
+  nominal_xrp: "0.1"
+  escrow_nominal_xrp: "0.5"
+
+scoring:
+  weights:
+    constraint_fit: 0.50
+    cost: 0.30
+    reliability: 0.20
+  preference_bonus:
+    preferred_suppliers: 0.10
+    avoid_suppliers: -0.25
+    repeat_choice_in_history: 0.05

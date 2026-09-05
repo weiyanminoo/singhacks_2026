@@ -1,0 +1,45 @@
+{
+  "id": "organizer-01",
+  "name": "Asia Fintech Summit",
+  "org": "Meridian Events Pte Ltd",
+  "event": {
+    "name": "Asia Fintech Summit",
+    "venue": "Marina Hall",
+    "attendees": 1000,
+    "date": "2026-10-15",
+    "city": "Singapore",
+    "venue_deposit": 50000,
+    "attendee_revenue_at_risk": 300000
+  },
+  "envelope": {
+    "limit": "80000",
+    "asset": "SGD",
+    "note": "Business layer. Settlement is nominal XRP on testnet (D-018)."
+  },
+  "constraints": {
+    "min_capacity": 1000,
+    "same_city": "Singapore",
+    "deadline_fixed": true,
+    "deadline_hours": 48,
+    "public_transport_required": true,
+    "av_required": true,
+    "max_venue_cost": 50000,
+    "max_av_cost": 15000,
+    "max_catering_cost": 15000,
+    "approval_threshold": 10000
+  },
+  "preferences": {
+    "preferred_suppliers": ["Suntec Backup Hall"],
+    "avoid_suppliers": [],
+    "notes": "Has run three events at Suntec; setup crew is known."
+  },
+  "history": [
+    {
+      "at": "2026-03-02",
+      "event": "venue.degraded",
+      "chose": "Suntec Backup Hall",
+      "over": "Expo Venue C",
+      "because": "Expo access depends on a single MRT line; failed once before"
+    }
+  ]
+}
