@@ -139,11 +139,11 @@ in [Failure handling](#failure-handling). See D-011.
 
 <!-- Explain the SINGLE-asset choice as a design decision (docs/00-decisions.md
      D-002a, which supersedes D-002). Points to make:
-     - The envelope IS the RLUSD trust line balance. One number, one ceiling.
+     - The envelope IS the session wallet XRP balance. One number, one ceiling.
      - XRP in the account is operational only — reserves and ~10 drops per tx in
        fees. Not agent-spendable: the policy engine issues RLUSD payments to
        allowlisted registry destinations and nothing else.
-     - The sub-cent argument is about RAILS, not denomination. A $0.02 payment is
+     - The sub-cent argument is about RAILS, not denomination. A 0.02 payment is
        impossible on card networks whatever the asset settles it.
      - D-002 (the earlier two-asset design) is kept in the decision log on
        purpose — showing the reasoning that was revised is worth more than
