@@ -114,8 +114,9 @@ their source.
 - [ ] `vendors/main.py`: one FastAPI app, data-driven handlers, routers for
       `/flights/skyline`, `/hotels/aurora`, `/data/status`
 - [ ] x402-gate them via **`x402-xrpl`** (not `x402-secure` — different packages,
-      D-010), **priced in RLUSD**. Demo scale $0.0005/call; confirm the facilitator
-      has no minimum above that, and if it does, raise toward $0.02 (D-009)
+      D-010), **priced in RLUSD at $0.02/call** (D-012 — the real price, not
+      scaled). **If the facilitator enforces a minimum above $0.02: STOP AND ASK.**
+      Do not pick a fallback unilaterally.
 - [ ] `x402_client.py`: real 402 challenge → pay → retry
 - [ ] Free tier on data endpoints returns schema + stale sample; paid returns live
 

@@ -44,11 +44,22 @@ inside a spending envelope you approved in advance.
 
 If a design decision would weaken any of those three, it is the wrong decision.
 
-**Scale (D-009):** the demo runs at **1/40 — a $10 envelope, $10.00 → $2.96** —
-because the testnet RLUSD faucet caps at 10 RLUSD/24h. Demo discovery is
-$0.0005/query; **real-world economics in the README use ~$0.02/query**, since the
-price of information does not scale with the size of the trip. Keep those two
-numbers distinct and never blend them.
+**Scale (D-009, refined by D-012):** the demo runs a **$10 envelope** because the
+testnet RLUSD faucet caps at 10 RLUSD/24h. **Purchases** scale 1/40; **discovery
+does not** — it stays at the real **$0.02/query**, because the price of a data
+query does not shrink because the trip is smaller. One set of numbers everywhere:
+
+| | |
+|---|---|
+| Envelope | $10.00 |
+| Discovery | 7 × $0.02 = **$0.14** |
+| Purchases | $4.60 flight + $1.95 hotel + $0.49 car = $7.04 |
+| Ends at | **$10.00 → $2.82** |
+| Hotel cap | $6.25 (rejected option: $7.75) |
+
+The RLUSD is a **revolving float, not a budget** — vendors are our own accounts,
+so `python scripts/setup_wallets.py recycle` returns it. Only XRP fees are truly
+spent (~0.00013 XRP/run against 100 XRP balances).
 
 ---
 
@@ -304,7 +315,7 @@ fastapi, uvicorn, httpx, xrpl-py, python-dotenv, x402-xrpl, openai, pytest
 
 All agent spending is **RLUSD**: the 7 discovery payments and the 3 purchases
 alike. The envelope *is* the session wallet's RLUSD trust line balance — one
-number, one ceiling, one story. The UI reads `$10.00 → $2.96` (1/40 scale, D-009).
+number, one ceiling, one story. The UI reads `$10.00 → $2.82` (D-009, D-012).
 
 **Live testnet values, already set up:**
 

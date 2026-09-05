@@ -7,9 +7,9 @@ explicitly requires transaction hashes or explorer references.
 Network: **XRPL Testnet**
 Explorer: `https://testnet.xrpl.org/transactions/{hash}`
 
-**Scale note (D-009):** the demo runs at **1/40 scale** — a $10 envelope, not $400 —
-because the public testnet RLUSD faucet caps at 10 RLUSD/24h. Every amount below
-is real RLUSD. The README quotes real-world unit economics separately.
+**Scale note (D-009, D-012):** the demo runs a **$10 envelope**, not $400, because
+the public testnet RLUSD faucet caps at 10 RLUSD/24h. Purchases scale 1/40;
+discovery stays at the real **$0.02/query**. Every amount below is real RLUSD.
 
 ---
 
@@ -71,13 +71,13 @@ in the README.
 
 | # | Provider | Endpoint | Price | Hash |
 |---|---|---|---|---|
-| 1 | Skyline Air | `/flights/skyline/availability` | $0.0005 RLUSD | |
-| 2 | AeroConnect | `/flights/aeroconnect/availability` | $0.0005 RLUSD | |
-| 3 | Status Feed | `/data/status/waivers` | $0.0005 RLUSD | |
-| 4 | Aurora Grand | `/hotels/aurora/availability` | $0.0005 RLUSD | |
-| 5 | Transit Inn | `/hotels/transit-inn/availability` | $0.0005 RLUSD | |
-| 6 | Meridian | `/hotels/meridian/availability` | $0.0005 RLUSD | |
-| 7 | SwiftCar | `/ground/swiftcar/eta` | $0.0005 RLUSD | |
+| 1 | Skyline Air | `/flights/skyline/availability` | $0.02 RLUSD | |
+| 2 | AeroConnect | `/flights/aeroconnect/availability` | $0.02 RLUSD | |
+| 3 | Status Feed | `/data/status/waivers` | $0.02 RLUSD | |
+| 4 | Aurora Grand | `/hotels/aurora/availability` | $0.02 RLUSD | |
+| 5 | Transit Inn | `/hotels/transit-inn/availability` | $0.02 RLUSD | |
+| 6 | Meridian | `/hotels/meridian/availability` | $0.02 RLUSD | |
+| 7 | SwiftCar | `/ground/swiftcar/eta` | $0.02 RLUSD | |
 | — | **MetroLink — DECLINED** | `/ground/metrolink/eta` | not paid | — |
 
 **Discovery total:** _____ RLUSD across 7 transactions
@@ -93,7 +93,7 @@ in the README.
 | Room, 1 night | Transit Inn | $1.95 | `d_012` | `hotel_cap_6_25` | |
 | Airport transfer | SwiftCar | $0.49 | `d_015` | `ground_cap_1_00` | |
 
-**Envelope:** $10.00 → $2.96
+**Envelope:** $10.00 → $2.82
 
 ### Refundable hold
 

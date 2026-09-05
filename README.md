@@ -34,14 +34,17 @@ policy engine, the spending controls, the failure recovery.
 inventory and latency. Travel API sandbox approval takes days and we had 24 hours.
 Integration path in [Beyond the prototype](#beyond-the-prototype).
 
-**Scaled:** the demo runs a **$10 envelope, not $400** — 1/40 scale. The public
-testnet RLUSD faucet dispenses 10 RLUSD per 24 hours, so a larger envelope cannot
-be funded with real RLUSD. We chose authentic RLUSD at small scale over a
-self-issued token at large scale. Every amount you see on the explorer is real.
-Real-world unit economics are quoted separately under
-[Beyond the prototype](#beyond-the-prototype) — notably, discovery costs ~$0.02
-per query in practice, because the price of information does not scale with the
-size of the trip. See `docs/00-decisions.md` D-009.
+**Scaled:** the demo runs a **$10 envelope, not $400**. The public testnet RLUSD
+faucet dispenses 10 RLUSD per 24 hours, so a larger envelope cannot be funded with
+real RLUSD — and we chose authentic RLUSD at small scale over a self-issued token
+at large scale. Every amount on the explorer is real.
+
+**Purchases** are scaled 1/40 ($4.60 flight, $1.95 hotel, $0.49 transfer).
+**Discovery is not scaled** — it stays at its real price of **$0.02 per query**,
+$0.14 across 7 providers, because the cost of a data query does not shrink because
+the trip is smaller. So the discovery figure you see in the trace is the same one
+used in the unit economics under [Beyond the prototype](#beyond-the-prototype).
+See `docs/00-decisions.md` D-009 and D-012.
 
 **Not built:** conditional escrow. `TokenEscrow` is an enabled amendment, but
 locking an issued token also requires the *issuer* to set

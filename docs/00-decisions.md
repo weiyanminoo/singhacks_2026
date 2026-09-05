@@ -195,6 +195,30 @@ Two follow-ons:
    $0.0005. If it does, discovery pricing moves back toward $0.02 and the
    envelope split changes.
 
+### D-012 · Discovery stays at the real $0.02/query; only purchases scale
+**Refines:** [D-009](#d-009--demo-runs-at-140-scale-on-real-rlusd--10-envelope-not-400).
+**Date/time:** T+0
+**Context:** D-009 scaled everything by 1/40, which put discovery at $0.0005/query.
+That broke the demo in two ways. The beat sheet says *"pays a couple of cents per
+query"* while 7 × $0.0005 = **$0.0035** — the envelope counter barely moves, so
+the 20 seconds we spend watching discovery accumulate shows nothing, and the
+narration is simply false. It also forced us to carry two different discovery
+figures (demo vs README) and keep them straight forever.
+**Decision:** Purchases scale 1/40; **discovery does not**. Discovery is
+$0.02/query — the real price — giving $0.14 across 7 queries, 1.4% of a $10
+envelope. Envelope reads **$10.00 → $2.82**.
+**Alternatives considered:** Strict 1/40 on everything (internally consistent, but
+invisible on screen and makes the narration a lie); raising the envelope
+(impossible — faucet cap, D-009).
+**Consequence:** The cost of a data query does not shrink because the trip is
+smaller, so this is *more* honest than proportional scaling, not less. Demo
+numbers and README unit economics are now the same number, so the dual
+bookkeeping D-009 imposed disappears. Discovery is visible on screen and the
+narration is accurate. Also near-certainly above any x402 facilitator minimum,
+which de-risks the open question in D-009.
+**Standing instruction:** if the facilitator *does* enforce a minimum above
+$0.02, **stop and ask** — do not pick a fallback unilaterally.
+
 ### D-010 · x402 package is `x402-xrpl`, not `x402-secure`
 **Date/time:** T+0
 **Context:** `CLAUDE.md` named `x402-secure` in the stack, taken from the t54
