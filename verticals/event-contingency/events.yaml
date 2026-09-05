@@ -1,28 +1,22 @@
-# Mock event feed the trigger loop polls. Events start dormant so the loop
-# cannot consume one before a viewer is connected; the demo button fires it.
-
 events:
-  - id: evt-001
-    type: venue.unusable
-    pending: false
-    at: "2026-10-13T09:00:00+08:00"
-    subject: organizer-01
-    payload:
-      venue: Marina Hall
-      cause: flooding
-      severity: critical
-      hours_to_event: 48
-      public_transport_disrupted: true
-      capacity_lost_pct: 100
-
-  # Below the 50% threshold in template.yaml, so the playbook correctly ignores
-  # it. Present to show the trigger evaluates conditions, not just event type.
-  - id: evt-002
-    type: venue.degraded
-    pending: false
-    at: "2026-10-12T14:30:00+08:00"
-    subject: organizer-01
-    payload:
-      venue: Marina Hall
-      cause: partial_power_outage
-      capacity_lost_pct: 20
+- id: evt-001
+  type: venue.unusable
+  pending: false
+  at: '2026-10-13T09:00:00+08:00'
+  subject: organizer-01
+  payload:
+    venue: Marina Hall
+    cause: flooding
+    severity: critical
+    hours_to_event: 48
+    public_transport_disrupted: true
+    capacity_lost_pct: 100
+- id: evt-002
+  type: venue.degraded
+  pending: false
+  at: '2026-10-12T14:30:00+08:00'
+  subject: organizer-01
+  payload:
+    venue: Marina Hall
+    cause: partial_power_outage
+    capacity_lost_pct: 20

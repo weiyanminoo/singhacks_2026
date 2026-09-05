@@ -27,7 +27,18 @@ async def run(
     emit,
     adapter_name: str = "mock",
 ) -> dict:
-    """Execute one contingency recovery, streaming trace events as it goes."""
+    """Execute one contingency recovery, streaming trace events as it goes.
+
+    Two shapes of playbook, one entry point: a template with `plans` compares
+    whole recovery strategies first (D-018), a template with bare `steps` goes
+    straight to execution.
+    """
+    if templates.load(vertical).get("plans"):
+        from app import engine_plans
+        return await engine_plans.run(event=event, profile_id=profile_id,
+                                      vertical=vertical, emit=emit,
+                                      adapter_name=adapter_name)
+
     tpl = templates.load(vertical)
     profile = profiles.load(profile_id)
     providers = registry.load(vertical)

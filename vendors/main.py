@@ -61,7 +61,7 @@ EVENT: dict[str, list[dict]] = {
     ],
     "/av/supplier-b": [
         {"id": "av_b", "supplier": "AV Supplier B", "label": "Full stage AV",
-         "price": "10000", "reliability": 0.55,
+         "price": "8000", "reliability": 0.55,
          "attributes": {"available": False, "note": "crew committed elsewhere"}},
     ],
     "/catering/supplier-a": [

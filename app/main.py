@@ -19,8 +19,8 @@ from app import engine, profiles, registry, templates, triggers, xrpl_ops
 
 STATIC = pathlib.Path(__file__).resolve().parent / "static"
 
-VERTICAL = os.getenv("VERTICAL", "flight-disruption")
-PROFILE = os.getenv("PROFILE", "traveller-01")
+VERTICAL = os.getenv("VERTICAL", "event-contingency")
+PROFILE = os.getenv("PROFILE", "organizer-01")
 ADAPTER = os.getenv("EXECUTOR", "mock")
 
 app = FastAPI(title="alternate.ai")

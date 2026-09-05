@@ -1,33 +1,82 @@
-"""x402 client — STUB for Phase 1.
+"""x402 client — real 402 → pay → retry.
 
-Returns plausible fake hashes so the agent loop and UI can be built and tested
-before the real 402 -> pay -> retry path lands in Phase 2. The signature is the
-one agreed in CLAUDE.md's interface contract and will not change when the real
-implementation replaces the body.
+Wraps `X402RequestsSession`, which handles the challenge, signs an XRPL payment
+and retries. Verified working end to end at T+5 (see TRANSACTIONS.md).
 
-Phase 2 replaces this with `x402-xrpl` (D-010) against the t54 testnet
-facilitator. If that facilitator enforces a minimum price above $0.02, STOP AND
-ASK rather than picking a fallback (D-012).
+Two things worth knowing:
+
+1. The session is **synchronous** (`requests`), so calls run in a thread so as
+   not to block the event loop while settlement completes (~10s per call).
+2. The transaction hash comes back in the `payment-response` header, base64 JSON,
+   under both `transaction` and `extensions.t54Attestation.paymentTxHash`. That
+   hash is what the decision trace records — it is the receipt.
+
+Header naming diverges from upstream x402 (`PAYMENT-SIGNATURE` rather than
+`X-PAYMENT`), so a stock x402 client will not interoperate unchanged. See D-017.
 """
-import secrets
+from __future__ import annotations
 
-STUB = True
+import asyncio
+import base64
+import json
+import os
+
+from xrpl.wallet import Wallet
+
+RPC_URL = os.getenv("XRPL_JSON_RPC", "https://s.altnet.rippletest.net:51234/")
+MAX_DROPS = os.getenv("X402_MAX_DROPS", "50000")
+
+STUB = False
+_session = None
 
 
-def _fake_hash() -> str:
-    return secrets.token_hex(32).upper()
+def _get_session(wallet: Wallet):
+    global _session
+    if _session is None:
+        from x402_xrpl import X402RequestsSession
+        _session = X402RequestsSession(wallet, rpc_url=RPC_URL, max_value=MAX_DROPS)
+    return _session
 
 
-async def pay_and_fetch(provider_id: str, path: str, params: dict, max_price: str) -> dict:
-    """Query a paid provider endpoint, settling the 402 challenge on XRPL.
-
-    Phase 1: returns a fake hash and empty data. Phase 2: real.
-    """
+def _decode_receipt(headers) -> dict:
+    raw = headers.get("payment-response")
+    if not raw:
+        return {}
+    try:
+        d = json.loads(base64.b64decode(raw + "=" * (-len(raw) % 4)))
+    except Exception:
+        return {}
+    att = (d.get("extensions") or {}).get("t54Attestation") or {}
     return {
-        "ok": True,
-        "data": {},
-        "price_paid": max_price,
-        "tx_hash": _fake_hash(),
-        "ledger_index": 0,
-        "stub": True,
+        "tx_hash": d.get("transaction") or att.get("paymentTxHash"),
+        "payer": d.get("payer"),
+        "network": d.get("network"),
+        "attestor": att.get("attestor"),
+        "status": att.get("status"),
     }
+
+
+def _fetch_sync(wallet: Wallet, url: str, timeout: int) -> dict:
+    s = _get_session(wallet)
+    r = s.get(url, timeout=timeout)
+    receipt = _decode_receipt(r.headers)
+    return {
+        "ok": r.status_code == 200,
+        "status": r.status_code,
+        "data": r.json() if r.headers.get("content-type", "").startswith("application/json") else {},
+        "paid": bool(receipt.get("tx_hash")),
+        **receipt,
+    }
+
+
+async def pay_and_fetch(wallet: Wallet, url: str, *, timeout: int = 90) -> dict:
+    """Fetch a paid resource, settling the 402 challenge on XRPL.
+
+    Never raises on a provider problem — a supplier that fails verification is a
+    normal outcome the engine must route around, not an exception.
+    """
+    try:
+        return await asyncio.to_thread(_fetch_sync, wallet, url, timeout)
+    except Exception as exc:
+        return {"ok": False, "status": 0, "data": {}, "paid": False,
+                "error": f"{type(exc).__name__}: {exc}"}
