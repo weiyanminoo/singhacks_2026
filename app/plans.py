@@ -22,10 +22,9 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-# Which cost components count as which term of the model. Data would be better,
-# but these four terms are the model itself, not a domain detail.
-REFUND_KEYS = ("attendee_refunds", "exhibitor_refunds")
-DELAY_KEYS = ("attendee_churn_risk", "speaker_rebooking")
+# The four terms are the model. WHICH cost component feeds which term is domain
+# knowledge, so the template declares it (`cost_terms:`) and the engine reads it.
+DEFAULT_TERMS: dict[str, tuple] = {"expected_refunds": (), "expected_delay_penalty": ()}
 
 
 def _d(v) -> Decimal:
@@ -48,7 +47,8 @@ def feasibility(plan: dict, profile: dict) -> tuple[bool, list[str]]:
     return (not against), against
 
 
-def cost_of(plan: dict, *, step_estimates: dict[str, dict] | None = None) -> dict:
+def cost_of(plan: dict, *, step_estimates: dict[str, dict] | None = None,
+            terms: dict | None = None) -> dict:
     """Total expected cost, broken into the four terms of the model.
 
     A plan with explicit `costs` uses them. A plan with `steps` derives its cost
@@ -57,11 +57,14 @@ def cost_of(plan: dict, *, step_estimates: dict[str, dict] | None = None) -> dic
     """
     direct = refunds = delay = risk = Decimal("0")
 
+    t = {**DEFAULT_TERMS, **(terms or {})}
+    refund_keys = set(t.get("expected_refunds") or ())
+    delay_keys = set(t.get("expected_delay_penalty") or ())
     for key, val in (plan.get("costs") or {}).items():
         amt = _d(val)
-        if key in REFUND_KEYS:
+        if key in refund_keys:
             refunds += amt
-        elif key in DELAY_KEYS:
+        elif key in delay_keys:
             delay += amt
         else:
             direct += amt
@@ -95,7 +98,8 @@ def evaluate(template: dict, profile: dict,
     out = []
     for plan in template["plans"]:
         ok, against = feasibility(plan, profile)
-        costs = cost_of(plan, step_estimates=(step_estimates or {}).get(plan["id"]))
+        costs = cost_of(plan, step_estimates=(step_estimates or {}).get(plan["id"]),
+                        terms=template.get("cost_terms"))
 
         # Budget feasibility is checked against DIRECT cash spend, not against
         # total expected cost. The S$80,000 contingency budget is a cash ceiling

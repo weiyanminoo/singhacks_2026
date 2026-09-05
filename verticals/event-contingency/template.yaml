@@ -21,6 +21,12 @@ objective: >
   {profile.event.date}, or refund, within S${profile.envelope.limit} and all
   organizer constraints.
 
+# Which cost components feed which term of the expected-cost model. Declared
+# here so the engine never needs to know what an "attendee refund" is.
+cost_terms:
+  expected_refunds: [attendee_refunds, exhibitor_refunds]
+  expected_delay_penalty: [attendee_churn_risk, speaker_rebooking]
+
 # --- Recovery plans, compared before anything is bought --------------------
 # `effects` are what the plan does to the world; the organizer's constraints
 # decide whether that is acceptable. The engine never knows what "postpone"
@@ -58,6 +64,9 @@ plans:
         required: true
         depends_on: []
         cap_key: venue
+        # Largest commitment: hold it in escrow and release on verified setup.
+        # The engine reads this flag; it does not know what a venue is.
+        escrow: true
         constraints:
           min_capacity: "{profile.constraints.min_capacity}"
           requires_public_transport: "{profile.constraints.public_transport_required}"

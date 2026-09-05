@@ -46,10 +46,15 @@ async def run(*, event: dict, profile_id: str, vertical: str, emit,
     # ---------- 1. Screening ------------------------------------------------
     p = event.get("payload", {})
     await emit({"type": "agent", "agent": "screening", "status": "running"})
+    # Label numbers, show strings bare — generic over any payload shape, but
+    # still readable. "48" alone tells a viewer nothing.
+    detail = " · ".join(
+        (f"{v}" if isinstance(v, str) else f"{k.replace('_', ' ')} {v}")
+        for k, v in p.items()
+        if k not in ("severity",) and not isinstance(v, (dict, list, bool)))
     await emit({"type": "trace", "id": "screen", "status": "done",
                 "text": f"Disruption classified — {event['type']}, severity {p.get('severity')}",
-                "detail": f"{p.get('venue')} · {p.get('cause')} · "
-                          f"{p.get('hours_to_event')}h to event", "cost": None})
+                "detail": detail, "cost": None})
     if p.get("public_transport_disrupted"):
         await emit({"type": "trace", "id": "screen-2", "status": "done",
                     "text": "Operating constraint added: public transport around the "
@@ -276,7 +281,7 @@ async def _verify_step(step, tpl, profile, providers, catalogue, ledger, wallet,
                     "cost": tpl["discovery"]["price_display"]})
         trace["providers_considered"].append({"provider": prov["id"], "status": "confirmed"})
         return {"option": opt, "provider": prov, "verdict": verdict,
-                "hold": body.get("hold_reference")}
+                "step": step, "hold": body.get("hold_reference")}
     return None
 
 
@@ -297,7 +302,7 @@ async def _settle(chosen, confirmed, tpl, providers, ledger, emit, trace, live) 
             await emit({"type": "approval", "reason": verdict["reason"],
                         "amount": f"S${sgd:,.0f}", "option": opt["label"]})
 
-        if step_id == "replacement_venue" and live:
+        if pick.get("step", {}).get("escrow") and live:
             cond, ful = escrow_mod.make_condition(
                 f"{opt['id']}|{pick.get('hold')}|milestone:setup_verified")
             c = await escrow_mod.create(from_role="session",
