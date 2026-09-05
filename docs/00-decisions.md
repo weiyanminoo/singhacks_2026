@@ -195,6 +195,58 @@ Two follow-ons:
    $0.0005. If it does, discovery pricing moves back toward $0.02 and the
    envelope split changes.
 
+### D-018 · Pivot to event contingency (ContingencyOS) + two-layer money model
+**Date/time:** T+5
+**Context:** Business line changes from flight disruption to Singapore event
+management: a 1,000-person conference whose venue floods 48h out, where the agent
+must choose between cancel / postpone / relocate and then execute the recovery.
+The D-015 engine was built domain-neutral, so this is a vertical swap plus one
+structural addition, not a rebuild.
+**Decision — product:** Build the event vertical only. Keep the flight vertical
+files in the repo unchanged; they cost nothing and they are the evidence that
+"adding a vertical is a data file" is true rather than asserted.
+**Decision — structure:** Add a **plan layer** above the existing step layer. The
+engine currently picks the best option per step; it must now first compare whole
+plans (cancel / postpone / relocate) on total expected loss, reject infeasible
+ones, then execute the winner's steps with the machinery that already exists.
+`plans:` wraps `steps:`.
+**Decision — money, three layers, deliberately separated:**
+
+| Layer | Denomination | On ledger? |
+|---|---|---|
+| Business | S$ (S$80,000 budget, S$42,000 venue) | **No** — UI and transaction memos only |
+| x402 verification | XRP, own small budget | **Yes** — real micropayments, the live x402 moment in the demo |
+| Settlement | XRP, nominal per transaction | **Yes** — real Payment/Escrow; the true S$ figure rides in the memo |
+
+**Alternatives considered:** Scaling S$ to XRP at a fixed ratio (1:1000 would
+consume the 85.9 XRP session balance in a single run, leaving nothing for escrow
+reserves or repeated demo takes; 1:10000 keeps legibility but still couples two
+things that are not the same kind of number).
+**Consequence:** The honest phrasing is load-bearing here. On-ledger amounts are
+**nominal testnet stand-ins**; the S$ figure is in the memo and the UI. We must
+never imply the XRP amount *is* the S$ amount. What the ledger genuinely proves
+is the commitment, its ordering, and its linkage to the decision and evidence
+that produced it — which is the actual "why blockchain" argument, and a stronger
+one than a number that happens to match.
+
+### D-019 · Escrow is back — XRP has no issuer to ask
+**Supersedes:** [D-011](#d-011--cut-list-item-1-executed--rlusd-token-escrow-is-unavailable).
+**Date/time:** T+5
+**Context:** D-011 cut escrow because issued-token locking needs the *issuer* to
+set `lsfAllowTrustLineLocking`, and Ripple's testnet RLUSD issuer does not. That
+reasoning was correct and is now obsolete: D-016 moved settlement to native XRP,
+which has no issuer and no such flag. `xrpl-py` exposes `EscrowCreate(condition=)`
+and `EscrowFinish(condition=, fulfillment=)`, so crypto-conditions are available.
+**Decision:** Reinstate escrow. Release the venue commitment against a
+**PREIMAGE-SHA-256 crypto-condition keyed to the milestone evidence hash**, with
+a time-based `FinishAfter` fallback if the condition encoding fights us inside a
+timebox.
+**Consequence:** Funds release on *verified evidence*, not on a clock — which is
+what the product claims and what makes escrow more than decoration. Restores the
+`EscrowCreate` / `EscrowFinish` / `EscrowCancel` row to the XRPL integration
+table that D-011 removed. Cut-list item 1 is un-spent; if we fall behind, escrow
+is again the first thing to go, back to a refund `Payment`.
+
 ### D-016 · Settle in XRP — the RLUSD faucet never delivered
 **Supersedes the asset choice in:** [D-002a](#d-002a--single-asset-envelope--all-agent-spending-in-rlusd) and [D-009](#d-009--demo-runs-at-140-scale-on-real-rlusd--10-envelope-not-400). The single-asset principle stands; the asset changes.
 **Date/time:** T+4

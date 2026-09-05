@@ -138,6 +138,24 @@ Raw running log. Newest at the bottom. Copy each hash here the moment it lands.
 [HH:MM] <type> <amount> <purpose> <hash>
 ```
 
+### T+5 · x402 client verified — a real 402 -> pay -> retry
+
+The x402 payer works end to end against our own gated endpoints. Unpaid GET
+returns 402; `X402RequestsSession` signs and submits an XRPL payment, retries,
+and receives the resource. 10.3s round trip including settlement.
+
+| | |
+|---|---|
+| Transaction | `AD159C3CA3D874D5BD3748DE969BCF217CA79C48872C6DE31E37C142D5176277` |
+| Result | Payment, validated, tesSUCCESS |
+| Flow | session `r9Pwpy1i…` → Skyline Air vendor `rwqggQdG…` |
+| Amount | 0.02 XRP · SourceTag 4021 |
+| Memo | x402 invoice id `CB0D03A47C9C423E9E5403EC9D3E1545` |
+
+The response carries a `payment-response` header with the facilitator's
+attestation (`t54Attestation`, `paymentTxHash`, `status: ready`), which is where
+the trace picks up the hash.
+
 ### T+4 · Phase 3 — agent purchases settled on XRPL, end to end
 
 Settled in **XRP** (D-016): the testnet RLUSD faucet never dispensed, so all

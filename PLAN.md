@@ -182,6 +182,91 @@ boundary.
 
 ---
 
+## Phase 5 — ContingencyOS: the thin thread (T+5 → T+9)
+
+**Pivot to event contingency (D-018).** Build the smallest complete path first,
+exactly as specified: event trigger → plan selection → x402 payment → XRPL
+escrow → milestone release → refund. Breadth comes in Phase 6.
+
+**Data — the vertical**
+- [ ] `verticals/event-contingency/template.yaml` — **new `plans:` layer** above
+      the existing `steps:`: cancel / postpone / relocate, each with its cost
+      components; relocate carries the step chain (venue → AV → catering → transport)
+- [ ] `verticals/event-contingency/registry.yaml` — ≥6 providers: Marina Hall
+      (flooded), Suntec Backup Hall, Expo Venue C (no transport), City Ballroom
+      (capacity 900), AV A/B, Catering A, Transport A
+- [ ] `verticals/event-contingency/events.yaml` — venue_failure, severity critical
+- [ ] `profiles/organizer-01.json` — Asia Fintech Summit, 1,000 pax, S$80,000 cap,
+      per-transaction S$10,000 approval threshold, all constraints
+
+**Engine — the one structural addition**
+- [ ] `plans.py`: expected-cost model —
+      `direct_recovery + expected_refunds + supplier_failure_risk + delay_penalty`
+- [ ] Plan-level rejection: capacity, deadline, transport access, budget
+- [ ] `engine.py`: compare plans → select → execute the winner's steps via the
+      machinery that already exists
+- [ ] Decision trace object + `decision_hash` (sha256 over the canonical trace)
+
+**Money — three layers, kept separate (D-018)**
+- [ ] Business layer S$ — UI and memos only, never claimed as on-ledger value
+- [ ] x402 layer — real XRP micropayments, own budget, **verified working T+5**
+- [ ] Settlement layer — real XRPL at a nominal amount, true S$ in the memo
+
+**Settlement**
+- [ ] `x402_client.py`: wrap `X402RequestsSession` (proven T+5); record tx hash
+      from the `payment-response` header into the trace
+- [ ] `escrow.py`: `EscrowCreate` with PREIMAGE-SHA-256 condition on the milestone
+      evidence hash; `EscrowFinish` with fulfillment; `EscrowCancel` (D-019).
+      **Timebox the condition encoding — fall back to `FinishAfter` and record it.**
+- [ ] Refund unused contingency balance to the organizer
+
+### ✅ MILESTONE M5 (T+9)
+**Flood event fires → three plans compared → relocate selected with reasons →
+one real x402 verification payment → escrow created → milestone released →
+unused balance refunded.** All hashes on testnet.xrpl.org.
+
+---
+
+## Phase 6 — Breadth: rejections, failure, full sequence (T+9 → T+13)
+
+- [ ] All four verification calls x402-gated: venue, transport, AV, catering
+- [ ] **Expo Venue C rejected** — public transport unavailable (required visual)
+- [ ] **City Ballroom rejected** — capacity 900 < 1,000
+- [ ] **AV Supplier B fails or times out → backup provider engaged** (required)
+- [ ] Milestone payments: partial venue payment after booking verification
+- [ ] Supplier failure → redirect or refund
+- [ ] The full 12-transaction sequence from the spec, logged in `TRANSACTIONS.md`
+- [ ] Human approval escalation above S$10,000 per transaction / S$80,000 total
+
+### ✅ MILESTONE M6 (T+13) — the complete recovery, end to end
+
+---
+
+## Phase 7 — Dashboard (T+13 → T+16)
+
+Five regions covering all nine required visuals:
+- [ ] Header: event profile + organizer constraints + live disruption
+- [ ] Agent activity timeline (Screening → Planning → Verification → Settlement)
+- [ ] Plan comparison: three plans, costs, selected one, **rejection reasons**
+- [ ] Money column: contingency balance, x402 activity, XRPL transactions with
+      clickable explorer links, settlement status
+- [ ] Final financial outcome: spend, avoided loss, unused balance refunded
+- [ ] Run full demo · simulation mode · reset
+
+### ✅ MILESTONE M7 (T+16) — HARD FEATURE FREEZE
+
+---
+
+## Phase 8 — Report, docs, submission (T+16 → T+22)
+
+- [ ] Final decision report (the trace, rendered)
+- [ ] `docs/phase-5-contingencyos.md`
+- [ ] README: rewrite for the event line of business; keep the honesty sections
+- [ ] `DEMO.md` rewritten to the flood scenario
+- [ ] Record the demo
+
+---
+
 ## Phase 4 — Sleep + failure + polish (T+11 → T+17)
 
 **T+11 → T+14: sleep in staggered shifts.** Do not skip. Hour 19 spent debugging
