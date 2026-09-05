@@ -69,6 +69,45 @@ def _fetch_sync(wallet: Wallet, url: str, timeout: int) -> dict:
     }
 
 
+def _probe_sync(url: str, timeout: int) -> dict:
+    import requests
+    r = requests.get(url, timeout=timeout)
+    if r.status_code != 402:
+        return {"challenged": False, "status": r.status_code}
+    try:
+        body = r.json()
+        accept = (body.get("accepts") or [{}])[0]
+    except Exception:
+        return {"challenged": True, "status": 402}
+    return {
+        "challenged": True,
+        "status": 402,
+        "x402_version": body.get("x402Version"),
+        "scheme": accept.get("scheme"),
+        "network": accept.get("network"),
+        "asset": accept.get("asset"),
+        "amount_drops": accept.get("amount"),
+        "pay_to": accept.get("payTo"),
+        "invoice_id": (accept.get("extra") or {}).get("invoiceId"),
+        "resource": (body.get("resource") or {}).get("url"),
+        "description": (body.get("resource") or {}).get("description"),
+    }
+
+
+async def probe(url: str, *, timeout: int = 15) -> dict:
+    """Fetch the 402 challenge WITHOUT paying, so the terms can be shown.
+
+    The SDK settles the challenge internally, so a viewer only ever sees the
+    result. This unpaid request surfaces what the provider is actually asking
+    for — price, asset, recipient address, invoice id — before any money moves.
+    It costs nothing on ledger and makes the mechanic legible instead of magic.
+    """
+    try:
+        return await asyncio.to_thread(_probe_sync, url, timeout)
+    except Exception as exc:
+        return {"challenged": False, "error": str(exc)[:120]}
+
+
 async def pay_and_fetch(wallet: Wallet, url: str, *, timeout: int = 90) -> dict:
     """Fetch a paid resource, settling the 402 challenge on XRPL.
 

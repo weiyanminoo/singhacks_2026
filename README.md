@@ -1,409 +1,494 @@
-# alternate.ai
+# ContingencyOS
 
-> A recovery agent that fixes broken plans by buying the fix, inside a spending
-> envelope you approved in advance.
+> **Event-triggered programmable payment workflow for event organizers.**
+> When a venue becomes unusable hours before an event, an AI agent decides
+> whether to relocate, postpone or refund — then executes that decision with
+> real money, inside a budget the organizer pre-authorised.
 
 **SingHacks 2026 — Build an AI-Native Business on XRPL**
-
-<!--
-  ⚠️ THIS FILE IS A GRADED DELIVERABLE, NOT DOCUMENTATION.
-  ~70% of the score is read out of this repo, and this file carries most of it.
-
-  FILL SECTIONS IN AS THE WORK LANDS — do not wait for Phase 5. Each heading is
-  tagged with the phase that should complete it. See the phase→section map in
-  CLAUDE.md.
-
-  Delete every HTML comment before submitting.
--->
-
-*In aviation, the **alternate** is the backup airport you are required to nominate
-before you take off. A fallback designated in advance, funded in advance.*
+Network: **XRPL Testnet only.** No EVM sidechain, no other chain.
 
 ---
 
-## What is real and what is simulated  `[Phase 0]`
+## What is real, what is simulated
 
-<!-- Keep this near the top. Honesty reads as confidence. -->
+Stated up front, because everything below depends on it.
 
-**Real:** every XRPL transaction, on Testnet. Agent purchases are signed,
-submitted and validated on ledger, each carrying `SourceTag: 4021` and a memo
-resolving to the decision that caused it and the policy rule that permitted it.
-The x402 gating is real: an unpaid request to any supplier returns a genuine 402.
-Also real: the trigger loop, the agent's decisions, the policy engine, the
-spending controls.
+| | |
+|---|---|
+| **Real** | Every XRPL transaction. x402 payments settle on Testnet against the t54 facilitator. Escrow uses genuine crypto-conditions. The agent's decisions, the policy engine, the spending controls and the failure recovery all run for real. |
+| **Simulated** | The eight suppliers. Real venue, AV and catering APIs require commercial onboarding measured in weeks. Integration path is in [Beyond the prototype](#beyond-the-prototype). |
+| **Two-layer money** | S$ figures are the organizer's **business layer**. They appear in the UI and ride inside transaction memos. On-ledger amounts are **nominal testnet XRP** — 0.02 XRP per verification, 0.1 XRP per settlement. **The XRP amount is not the S$ amount and we never claim it is.** |
 
-**Simulated:** the vendors. Eight mock providers with genuinely different pricing,
-inventory and latency. Travel API sandbox approval takes days and we had 24 hours.
-Integration path in [Beyond the prototype](#beyond-the-prototype).
-
-**Settled in XRP, not RLUSD — and here is why, because we tried.** We set RLUSD
-trust lines on all nine accounts (real, on ledger, hashes in
-[TRANSACTIONS.md](TRANSACTIONS.md)) and imported the session wallet into a
-browser wallet on Testnet. The public testnet RLUSD faucet still never dispensed:
-it is wallet-connect only with no address field, hung on a trust line that
-already existed and it could not detect, then failed with a generic
-`PREPARATION ERROR`. Nothing reached the ledger; audited balances show 0.00 RLUSD
-across all ten accounts. XRP needs no trust line and x402 supports it natively,
-so the mechanics are identical and the demo no longer depends on a faucet we do
-not control. The trust lines stay in place as evidence. See `docs/00-decisions.md`
-D-016.
-
-**On the numbers:** the UI renders a `$` sign for legibility, but the ledger moves
-**XRP**. A 10 XRP envelope is not ten dollars and we do not claim it is. Purchases
-are scaled 1/40; discovery is unscaled at 0.02 per query, because the cost of a
-data query does not shrink because the trip is smaller (D-009, D-012).
-
-**Not built:** conditional escrow. `TokenEscrow` is an enabled amendment, but
-locking an issued token also requires the *issuer* to set
-`lsfAllowTrustLineLocking`, and Ripple's testnet RLUSD issuer does not
-(`Flags = 0x819a0000`, verified T+0). The refundable hold is therefore a
-vendor-initiated refund `Payment`. Why escrow is the better production design is
-in [Failure handling](#failure-handling). See D-011.
+**What the ledger genuinely proves:** the commitment, its ordering, and its
+linkage to the decision and the policy rule that produced it. That is a stronger
+claim than a number that happens to match a fiat figure, and it is the one we
+make.
 
 ---
 
-## The problem  `[Phase 5]`
+## The problem
 
-<!-- Three paragraphs, no jargon.
-     1. The 9pm cancellation, told as a scene. 400 people, 30 rooms, 15 minutes.
-     2. Why humans lose: a multi-constraint decision under time pressure at the
-        worst hour, across vendors that don't talk to each other, while inventory
-        is consumed by others.
-     3. Scale + proof of willingness to pay: ~1 in 5 flights runs late against
-        4bn+ journeys a year; claim firms take 25–35% for handling only the
-        paperwork afterwards. -->
+At 9:00 a.m., two hours before a 1,000-person conference, the venue floods.
 
-## The product  `[Phase 5]`
+The organizer must now decide whether to cancel, postpone or relocate — and
+simultaneously handle venue deposits, attendee refunds, exhibitors, catering, AV,
+transport and supplier payments.
 
-<!-- Five sentences. Envelope set in advance → trigger → agent discovers, decides,
-     buys → ~90 seconds → confirmations and receipts.
-     Then separate the user (the stranded traveller) from the buyer (the company
-     or TMC). Keeping those apart makes the commercial model legible. -->
+**The problem is not that the organizer lacks a contingency plan. It is that the
+plan cannot execute fast enough.** A human can recommend a replacement venue in
+ten minutes. But by the time finance approves the spend, the venue, the AV crew
+and the transport capacity are gone — taken by whoever moved first.
 
-## Why autonomous payments make this possible  `[Phase 5]`
-
-<!-- The thesis. Three concrete points:
-     1. The envelope is a physical ceiling, not a policy check.
-     2. Broad search needs sub-cent payments; breadth is where the value is.
-     3. A recommendation is worthless inside a 15-minute window.
-     Be honest about cards: they handle the hotel room fine. They cannot handle
-     twenty two-cent queries, and they don't give a vendor instant final money
-     for inventory that expires tonight. -->
+Recovery is a race, and the binding constraint is authorisation latency, not
+judgement.
 
 ---
 
-## How the AI agent creates value  `[Phase 3]`
+## The product
 
-<!-- The three decisions, each with a REAL trace excerpt from a run:
-     1. Search-vs-commit under decaying inventory
-     2. Constraint conflict — show the REJECTED option and the reason
-     3. Cost-of-being-wrong — optimising the objective, not the price
-     Then one line: deterministic constraint scoring with LLM-driven planning
-     and selection. Detail in docs/phase-3-agent-decisions.md. -->
+The organizer sets a contingency policy in advance: budget, capacity floor, hard
+constraints, and how much the agent may spend without asking. A trigger loop
+watches for disruption events. When one fires:
+
+1. **Screening** classifies the disruption and derives new operating constraints
+2. **Planning** compares every recovery plan on total expected cost and rejects
+   the infeasible ones
+3. **Verification** pays providers, per query, to confirm what is *actually*
+   available right now
+4. **Settlement** escrows the venue, pays suppliers, releases on verified
+   milestones, and refunds what it did not use
+
+**Target customer:** conference and exhibition organizers, and the PCOs and
+venues that carry disruption risk on their balance sheet. The buyer is the
+organization; the beneficiaries are its attendees.
+
+---
+
+## Why this needs autonomous payments
+
+The product test, applied honestly:
+
+- **Remove the AI agent** → nothing evaluates competing recovery plans against
+  capacity, deadline, accessibility and budget simultaneously. You are back to a
+  human with a spreadsheet at 9 a.m.
+- **Remove autonomous payments** → the agent can recommend but not reserve.
+  Scarce replacement capacity is gone before approval returns. Same agent, same
+  data, worse outcome.
+- **Remove XRPL** → no independently verifiable record of which decision spent
+  which money under which rule. The audit trail becomes a log file the vendor
+  controls.
+
+And specifically on **paid verification**: comparing plans is free — indicative
+pricing is a rate card. Confirming that a venue is genuinely free tonight costs
+two cents, because *that* is the information which expires. In our recorded run
+the agent picks the cheaper AV supplier, pays to verify, discovers the crew is
+committed elsewhere, and reroutes to the backup. A free lookup would have booked
+an unavailable supplier.
+
+---
+
+## Architecture
 
 ```
-<!-- paste a real trace excerpt here -->
+   Event sources                Organizer policy            Recovery playbooks
+   poll · webhook · manual      profiles/*.json             verticals/*/template.yaml
+            \                          |                          /
+             +------------> Trigger evaluator <------------------+
+                                    |
+        +---------------------------+----------------------------+
+        |            THE ENGINE — no domain logic inside          |
+        |                                                         |
+        |   Screening  ->  Planning  ->  Verification  ->  Settlement
+        |   classify       compare        pay to confirm    escrow, pay,
+        |   severity       plans,         live availability  release, refund
+        |   constraints    reject                                 |
+        +--------|------------------|-------------------|---------+
+                 |                  |                   |
+            registry.yaml      policy.py            executor
+            (providers)     (caps, approval)     mock | xrpl
+                                                         |
+                            +----------------------------+
+                            |                            |
+                      x402 facilitator             XRPL Testnet
+                 xrpl-facilitator-testnet.t54.ai  Payment · Escrow
+                                                  Memos · SourceTag
+                                                         |
+                                        SSE  ->  organizer dashboard
 ```
 
-## Customer journey  `[Phase 3]`
+**The engine contains no event-industry logic.** A vertical is three data files
+(`template.yaml`, `registry.yaml`, `events.yaml`) plus an organizer profile. The
+repository ships a second, unused vertical (`flight-disruption`) as evidence that
+this is architectural rather than asserted — diff the two and you will find no
+engine changes between them.
 
-<!-- Screenshots: envelope setup → trigger → discovery → decision → purchases →
-     approval prompt → confirmations → receipt bundle. -->
+Verify it yourself:
 
-## Agentic transaction flow  `[Phase 2]`
-
-<!-- The actual mechanics, step by step:
-     agent selects provider from registry → GET endpoint → 402 with price →
-     signs XRPL Payment → facilitator verifies → 200 with live data → ... →
-     purchase via RLUSD Payment with SourceTag + Memos → confirmation delivered.
-     Escrow was cut (D-011); on the failure path the refundable hold is a
-     vendor-initiated refund Payment. -->
-
-## Architecture  `[Phase 3]`
-
-<!-- Diagram. One screen. -->
+```bash
+grep -rniE "venue|conference|attendee" app/*.py    # docstrings only
+```
 
 ---
 
-## XRPL integration  `[Phase 1]`
+## How the AI agent creates value
+
+A real trace excerpt from the recorded run:
+
+```
+[SCREENING]
+ * Disruption classified — venue.unusable, severity critical
+     Marina Hall · flooding · 48h to event
+ * Operating constraint added: public transport around the original site
+   is unavailable
+
+[PLANNING]                                     (free indicative pricing)
+ OK  Relocate to a replacement venue    S$ 82,250   cash S$75,000
+ OK  Cancel and refund attendees        S$245,000   cash S$25,000
+ REJ Postpone to a later date           S$ 65,000   cash S$20,000
+      -> organizer requires the event to stay within 48h; this plan moves the date
+ * Selected: Relocate — avoids S$164,930 versus cancel
+
+ X Rejected City Ballroom — S$28,000   capacity 900 is below the required 1000
+ X Rejected Expo Venue C  — S$35,000   public transport not available
+
+[VERIFICATION]                                 (paid, x402)
+ X HTTP 402 from Suntec Backup Hall — payment required
+     0.02 XRP to rn5D1Rfp… · invoice 9F41717116…
+ * Confirmed Suntec Backup Hall — hold HOLD-598729, expires in 20 min
+ X AV Supplier B failed verification
+     crew committed elsewhere — falling back to the next supplier
+ * Confirmed AV Supplier A — hold HOLD-869124
+
+[SETTLEMENT]
+ ! Approval escalated — Hall 402, full day (S$42,000 over the S$10,000 limit)
+ # EscrowCreate   Suntec Backup Hall — funds locked
+ # EscrowFinish   Setup milestone verified — funds released
+ # Payment        AV Supplier A · Catering Supplier A
+ # Refund         Unused contingency returned to organizer
+
+ OUTCOME  S$66,000 committed | S$14,000 unused | S$164,930 avoided
+```
+
+Three decisions worth pausing on:
+
+1. **Postpone was the cheapest plan and lost.** S$65,000 against relocate's
+   S$82,250 — rejected because the organizer's deadline is fixed. That is
+   constraint reasoning, not cost minimisation.
+2. **Two venues rejected for different reasons.** One on capacity, one on
+   transport accessibility. The cheaper venue is not the answer when nobody can
+   reach it.
+3. **A supplier failed after being selected.** The agent had already chosen the
+   cheaper AV supplier and paid to verify. Verification is what caught it.
+
+**Deterministic scoring, LLM narration.** Every cost, constraint check and cap is
+Python. The model writes the human-readable reason and the final report. It never
+does arithmetic and never overrides a constraint, which is why the run is
+reproducible.
+
+---
+
+## Agentic transaction flow
+
+```
+agent selects provider from the registry
+    │
+    ├─ GET /venue/suntec-backup            → 200, free indicative pricing
+    │                                        (enough to compare plans)
+    │
+    ├─ GET /venue/suntec-backup/verify     → 402 Payment Required
+    │      { x402Version: 2, scheme: "exact", network: "xrpl:1",
+    │        amount: "20000", asset: "XRP", payTo: "rn5D1Rfp…",
+    │        extra: { invoiceId: "9F41717116…", sourceTag: 4021 } }
+    │
+    ├─ sign + submit XRPL Payment 0.02 XRP → facilitator verifies
+    ├─ retry with PAYMENT-SIGNATURE        → 200 + live availability + hold ref
+    │      the response carries a payment-response header with the settling hash
+    │
+    └─ settlement
+         EscrowCreate  crypto-condition = SHA-256 of the milestone evidence
+         EscrowFinish  fulfillment presented once setup is verified
+         Payment       remaining suppliers, memo-linked to the decision
+         Payment       unused contingency returned to the organizer
+```
+
+**Escrow releases against evidence, not a clock.** The condition is a
+PREIMAGE-SHA-256 derived from `suntec|HOLD-598729|milestone:setup_verified`. The
+funds can only move when that evidence is presented as the fulfillment.
+
+**Interoperability, stated accurately.** `x402-xrpl` uses `PAYMENT-SIGNATURE` /
+`PAYMENT-REQUIRED` / `PAYMENT-RESPONSE` where upstream x402 uses `X-PAYMENT`. So
+a stock x402 or MPP client will **not** consume our endpoints unchanged — we
+verified this and reported it upstream. What is true: the challenge body is
+spec-shaped, so interoperability is a header-mapping shim, not a protocol gap.
+
+---
+
+## XRPL integration
 
 | What | XRPL feature | Why |
 |---|---|---|
-| Spending ceiling | Session wallet's XRP balance | The limit is the balance, not a code check |
-| Discovery queries | x402-gated `Payment` (XRP) ×7 | Micropayments card rails cannot process |
-| Purchases | `Payment` (XRP) ×3 | Instant final settlement, memo-linked to the decision |
-| Concurrent settlement | `TicketCreate` + `TicketSequence` | 7 discovery payments in one ledger close, not seven |
-| Audit trail | `Memos` + `SourceTag` | Every tx maps to a decision and a policy rule |
-| Refund on failure | `Payment` (RLUSD, vendor → session) | Money returns when the hotel sells out |
-| Key delegation | `SetRegularKey` | Agent key rotatable or revocable without moving funds |
-
-<!-- Explain the SINGLE-asset choice as a design decision (docs/00-decisions.md
-     D-002a, which supersedes D-002). Points to make:
-     - The envelope IS the session wallet XRP balance. One number, one ceiling.
-     - XRP in the account is operational only — reserves and ~10 drops per tx in
-       fees. Not agent-spendable: the policy engine issues RLUSD payments to
-       allowlisted registry destinations and nothing else.
-     - The sub-cent argument is about RAILS, not denomination. A 0.02 payment is
-       impossible on card networks whatever the asset settles it.
-     - D-002 (the earlier two-asset design) is kept in the decision log on
-       purpose — showing the reasoning that was revised is worth more than
-       pretending we got it right first time.
-     - Tickets: TicketBatch is a live amendment; we used it to solve a real
-       latency constraint rather than working around it with a mutex. Cross-ref
-       D-006a and the Performance section below. -->
-
-<!-- RESOLVED: escrow was cut at T+0 (D-011) because the testnet RLUSD issuer does
-     not set lsfAllowTrustLineLocking. The table row above now reads "Refund on
-     failure / Payment", which is what we actually built. Failure handling must
-     describe conditional escrow as the production design and say why it is
-     better: funds return automatically on a time bound, without depending on the
-     vendor's cooperation or solvency. -->
+| Paid verification | `Payment` (XRP) via x402 | Micropayments card rails cannot process |
+| Venue commitment | `EscrowCreate` + crypto-condition | Funds lock until the milestone is proven |
+| Milestone release | `EscrowFinish` + fulfillment | Release on evidence, not on a timer |
+| Timeout protection | `EscrowCancel` + `CancelAfter` | Funds return if the milestone never lands |
+| Supplier settlement | `Payment` (XRP) | Instant final settlement |
+| Audit trail | `Memos` + `SourceTag 4021` | Every payment names its decision and its rule |
+| Concurrency | `TicketCreate` / `TicketSequence` | Concurrent submission without sequence collisions |
+| Live network values | `server_info` | Fees and reserves read live, never hardcoded |
 
 ### Memo format
+
+Every agent transaction is self-describing on the public ledger:
 
 ```
 SourceTag: 4021
 MemoType:  alternate/booking
-MemoData:  BK-7741|decision:d_012|rule:hotel_cap_6_25
+MemoData:  HOLD-369668|decision:d_relocate_av|rule:approval_threshold
 ```
 
-Decode: `bytes.fromhex(memo_data).decode()`
+```python
+bytes.fromhex(memo_data).decode()
+```
 
-<!-- Any payment on the explorer traces back to the decision that caused it and
-     the rule that permitted it. -->
-
-## x402 usage  `[Phase 2]`
-
-<!-- Facilitator: https://xrpl-facilitator-testnet.t54.ai (network xrpl:1).
-     SDK: x402-xrpl (PyPI), version pinned - NOT x402-secure, see D-010.
-     Which endpoints are gated and at what price — priced in RLUSD (~$0.02/call),
-     not XRP drops, per D-002a. The free-tier pattern: free call returns schema +
-     stale sample, paid call returns live data.
-     Interoperability - STATE THIS CAREFULLY. We verified that x402-xrpl 0.3.2
-     uses PAYMENT-SIGNATURE / PAYMENT-REQUIRED / PAYMENT-RESPONSE headers, NOT
-     the upstream x402 X-PAYMENT spelling. So "an MPP client could consume our
-     endpoints unchanged" is FALSE as it stands and must not be claimed. What is
-     true: the challenge body is spec-shaped (x402Version 2, accepts[], scheme
-     exact, network xrpl:1), so interop is a header-mapping shim, not a protocol
-     gap. Say that instead - it is both honest and still a good answer. -->
-
-## XRPL AI Starter Kit / agent skill integration  `[Phase 2]`
-
-<!-- Required by the submission checklist. Name which components and where:
-     the xrpl-agentic-resources skill, xrpl-amendments.json for feature checks,
-     xrpl-fee-settings.json for cost figures, the vendored docs indexes.
-     Be specific — vague answers score nothing. -->
+Open any hash below on the explorer and you can read which decision caused the
+payment and which policy rule permitted it. That is the traceability claim, and
+it is verifiable without trusting us.
 
 ---
 
-## Transaction hashes  `[Phase 3, verified Phase 5]`
+## Transaction hashes
 
-Network: XRPL Testnet · Explorer: `https://testnet.xrpl.org`
+Network **XRPL Testnet** · Explorer `https://testnet.xrpl.org/transactions/{hash}`
+Session wallet: [`r9Pwpy1iBRXFEeZdn8ix51tUJfoj2PCwD8`](https://testnet.xrpl.org/accounts/r9Pwpy1iBRXFEeZdn8ix51tUJfoj2PCwD8)
 
 | # | What it demonstrates | Type | Hash |
 |---|---|---|---|
-| | | | |
+| 1 | **x402 paid verification** — invoice `AC16967C…` | Payment 0.02 XRP | [`CB258C4B…24D17`](https://testnet.xrpl.org/transactions/CB258C4B1D65ED17DD5984ACE90C26429A6D541EF1BE60D1BE74052750024D17) |
+| 2 | **x402 paid verification** — second provider | Payment 0.02 XRP | [`4C7356F0…C48118`](https://testnet.xrpl.org/transactions/4C7356F05D34C5DACA6594CB65D1792755F0B314823F808D2404168FCFC48118) |
+| 3 | **Venue funds locked** under a crypto-condition | EscrowCreate | [`5B350888…C20BD`](https://testnet.xrpl.org/transactions/5B350888DCE7DC2A2168BF01FA7740304E66857BFA591AECD96A128B500C20BD) |
+| 4 | **Milestone verified, funds released** | EscrowFinish | [`9944ADC8…E2308`](https://testnet.xrpl.org/transactions/9944ADC8B0ADB7DC6200081774233338FD1133D20ACAB0A548E0188CA52E2308) |
+| 5 | **AV supplier paid** — memo `decision:d_relocate_av` | Payment | [`8F6017BF…E040AB`](https://testnet.xrpl.org/transactions/8F6017BFB51C02EE12ACAF3F416111D6070082DA3465F142B32C5E3C07E040AB) |
+| 6 | **Catering supplier paid** — memo `HOLD-594011\|decision:d_relocate_catering` | Payment | [`0CFF93B2…B6B350`](https://testnet.xrpl.org/transactions/0CFF93B2609C7A9ED6DB3249771A976F1D1E4BB696F224A1A35661FD5BB6B350) |
+| 7 | **Unused contingency refunded** — memo `rule:unused_contingency` | Payment | [`FCD42A94…1E631`](https://testnet.xrpl.org/transactions/FCD42A94648BDD7BB01F59878F88475FAB5902AA081485B5F33D149DC761E631) |
 
-Full log: [TRANSACTIONS.md](TRANSACTIONS.md)
-
-<!-- Most reviewers look for this table. Never bury hashes in a log file. -->
+Full running log, including trust-line setup and the concurrency benchmarks:
+[TRANSACTIONS.md](TRANSACTIONS.md).
 
 ---
 
-## Trust, governance and agent controls  `[Phase 4]`
+## Trust, governance and agent controls
 
 | Criterion | How we handle it |
 |---|---|
-| **Transparency** | Streaming decision trace: every query, price, option considered, option rejected and why, running budget |
-| **Authorisation** | In-policy and under cap: autonomous. Over cap or out of policy: single-tap approval with the reason stated. Never autonomous: changing the envelope, adding a provider |
-| **Spending controls** | The session wallet holds exactly the envelope in RLUSD, and every purchase is an RLUSD payment to an allowlisted vendor — so the ceiling is the balance, not a code check. The account's small XRP balance covers fees and reserves and is not agent-spendable. Per-transaction, per-category and per-session caps sit inside that hard ceiling |
-| **Security** | Treasury separate from session wallet; agent signs with a regular key that can be rotated or disabled without moving funds; providers allowlisted in the registry |
-| **Traceability** | Every tx memo carries a decision reference; the receipt ledger maps tx ↔ decision ↔ policy rule ↔ booking reference |
-| **Failure handling** | See below — demonstrated live in the video |
-| **Safeguards** | Provider allowlist, duplicate-purchase guard (cannot book two hotels for one night), max actions per incident, kill switch |
+| **Transparency** | Streaming decision trace: every plan compared, every option rejected with its reason, every payment with its price and hash |
+| **Authorisation** | In-policy and under S$10,000: autonomous. Above it: escalated with the reason stated. Never autonomous: changing the budget or adding a provider |
+| **Spending controls** | Per-transaction, per-category and per-incident caps. Category caps are reported before the envelope cap, because "more than we spend on AV" explains a policy where "running low" only describes a balance |
+| **Security** | Treasury separate from the session wallet; suppliers allowlisted in the registry; the agent can only pay registry destinations |
+| **Traceability** | Every transaction memo names the decision and the rule; the run emits a SHA-256 `decision_hash` over the full trace |
+| **Failure handling** | Supplier verification failure falls through to the next candidate; escrow `CancelAfter` returns funds if a milestone never lands; unused budget is refunded |
+| **Safeguards** | Provider allowlist, duplicate-purchase guard, plan-level feasibility gates, simulation mode for failure testing |
 
-<!-- Add a paragraph mapping this onto the OpenWallet Standard: delegated agent
-     access and policy-gated signing are precisely this control layer, and
-     production would use it rather than a bespoke key setup. -->
-
-<!-- STATE HONESTLY (docs/00-decisions.md D-008): SetRegularKey demonstrates key
-     delegation on ledger, and the regular key can be rotated or disabled without
-     moving funds. Offline master-key custody is INTENDED PRODUCTION DESIGN and is
-     NOT demonstrated here — the master seed is in .env on the demo machine.
-     Do not write "the master key stays offline." Saying what we did not do is
-     what makes the rest of this table credible. -->
-
-## Failure handling  `[Phase 4]`
-
-<!-- The live path: vendor reports sold out AFTER settlement → escrow cancels →
-     funds return → agent reroutes → only the second option is paid.
-     Also: approval timeout, provider timeout, envelope exhausted.
-     For envelope exhausted, note that agent credit infrastructure (claw.credit)
-     is the natural production answer — settle against the traveller's
-     reimbursement or the airline compensation. -->
+**Stated honestly:** `SetRegularKey` gives the agent a key that can be rotated or
+disabled without moving funds. Offline master-key custody is **intended
+production design and is not demonstrated here** — the seed is in `.env` on the
+demo machine.
 
 ---
 
-## Reachability  `[Phase 5]`
+## Reachability
 
-<!-- 20% of the grade. Not an afterthought. -->
-
-### The pattern
-
-alternate.ai applies wherever four things are true:
+The engine applies wherever four things are true:
 
 1. Something breaks unexpectedly
 2. There is a short window before the fix gets worse or impossible
 3. The fix means buying from several unrelated parties
-4. Real constraints must hold while you do it
+4. Hard constraints must hold throughout
 
-### Other verticals
+Event disruption is the vertical we built. The same engine, with a different
+`template.yaml` and `registry.yaml`, addresses **logistics reroutes** (blocked
+lane, new carrier and warehousing under a customs deadline) and
+**disaster-relief procurement** (field supply under capacity and access
+constraints). We have **not** built those and do not claim them. What we claim is
+that the engine contains no event-industry logic — checkable in one grep.
 
-<!-- One paragraph each: delivery van breakdown mid-route; production line down
-     waiting on a part; venue cancels days before an event. Same engine — swap the
-     provider registry and the constraint set. -->
-
-### Interoperability, accessibility, compliance
-
-<!-- MPP compatibility. The engine takes a constraint set + a provider registry,
-     so a third party can point it at another vertical. Compliance position: not
-     merchant of record, acting under delegated authority with a preauthorised
-     envelope; bookings made with the vendor of record. -->
-
-## Commercial model  `[Phase 5]`
-
-<!-- Per-traveller subscription sold to TMCs and companies (~$10/traveller/month;
-     one TMC contract reaches thousands of travellers and they already hold
-     inventory access). 15–20% of recovered airline compensation, undercutting
-     the 25–35% incumbents. Supply-side revenue later.
-     The positioning point worth stating loudly: we take NO margin on what the
-     agent buys, because the moment we profit from its choices nobody trusts it
-     to spend their money.
-     Unit economics: ~$0.14 discovery (7 × $0.02) + ~$0.10 inference +
-     settlement fees. -->
+**Developer accessibility:** a new vertical is three YAML files. **Compliance
+position:** we are not merchant of record; the agent acts under delegated
+authority against a preauthorised budget, and bookings are made with the supplier
+of record.
 
 ---
 
-## Beyond the prototype  `[Phase 5]`
+## Commercial model
 
-<!-- 20% of the grade. Specific, with real numbers. -->
+Per-organizer subscription sold to conference and exhibition organizers and PCOs,
+priced against the risk carried rather than per transaction. A single mid-size
+organizer runs dozens of events a year, each with six-figure exposure.
+
+**We take no margin on what the agent buys.** The moment we profit from its
+choices, nobody trusts it to spend their money. Revenue comes from the
+subscription and, later, from the supply side — verified-availability endpoints
+are a product suppliers would pay to expose.
+
+---
+
+## Beyond the prototype
 
 ### Cost
 
-<!-- Per recovery, broken down. Present BOTH, per docs/00-decisions.md D-007:
-     - Testnet actuals: what this run actually cost, read live from our own node
-       (server_info / server_state).
-     - Mainnet projection: what it would cost on mainnet today, cited from
-       resources/xrpl-fee-settings.json (live mainnet state via xrpscan).
-     Presenting both is stronger than either alone, and it is exactly what the
-     Feasibility criterion asks for. Do not hardcode or guess either set. -->
+Measured live, not estimated. Testnet `server_info` at the time of the run: base
+fee **10 drops**, account reserve **1 XRP**, owner reserve **0.2 XRP** per object.
+Mainnet values from the bundled `xrpl-fee-settings.json` snapshot **agree today**,
+so these carry over. A full recovery is ~13 transactions ≈ **0.00013 XRP** in
+network fees — negligible against six-figure exposure. The real per-incident cost
+is verification and inference, not settlement.
 
 ### Performance
 
-<!-- Latency budget for the 90-second target: discovery round trips, x402
-     settlement time, LLM inference. Where the time actually goes.
-
-     LEAD WITH THE TICKETS RESULT (docs/00-decisions.md D-006a). The story:
-     the happy path is ~13 transactions; at a ~3-5s ledger close, fully
-     serialised settlement burns 40-65s before a single LLM token is generated,
-     against a 90s target. We pre-allocate tickets with TicketCreate and fire the
-     discovery leg concurrently with TicketSequence set and Sequence: 0, which
-     collapses that leg from ~35s to about one ledger close. Per-account locks,
-     not one global lock, because sequence collisions are per-account.
-     Give the measured before/after numbers from a real run.
-     If we fell back to per-account locks, say so plainly and describe tickets as
-     the intended design. -->
-
-Measured on testnet, same work (7 concurrent discovery payments):
-
 | Path | Time |
 |---|---|
-| Sequential, JSON-RPC | ~95s (extrapolated from 13.6s/payment) |
+| Sequential payments, JSON-RPC | ~95s (13.6s each) |
 | Concurrent via Tickets, JSON-RPC | 21.8s |
-| Concurrent via Tickets, WebSocket | **9.2s** |
+| Concurrent via Tickets, **WebSocket** | **9.2s** |
 
-The ledger closes every ~2.5s, so the gap between 21.8s and 9.2s was
-client-side polling, not consensus. Two independent fixes: `TicketCreate`
-pre-allocates sequence numbers so payments need not be serialised
-(D-006a), and a persistent WebSocket removes the HTTP poll loop (D-014).
-Together, roughly a 10x reduction on the leg that dominates the latency
-budget.
+The ledger closes every ~2.5s, so the gap between 21.8s and 9.2s was client-side
+polling, not consensus. Two independent fixes: `TicketCreate` pre-allocates
+sequence numbers so payments need not be serialised, and a persistent WebSocket
+removes the HTTP poll loop.
 
-
-### Scalability and reliability
-
-<!-- What breaks at 10,000 concurrent disruptions. Sequence handling per wallet
-     (see docs/00-decisions.md D-006a, which supersedes D-006). The testnet
-     facilitator is best-effort with no committed SLA; we pinned a version.
-     What production would need: ticket pools sized per wallet, and one session
-     wallet per active incident rather than a shared account. -->
+**The current bottleneck is x402, not XRPL.** The Python x402 client is
+synchronous with no batched path, so five verification calls take ~50s where
+seven concurrent ticketed payments take 9.2s. Reported upstream; the fix is an
+async client that accepts a pre-allocated `TicketSequence`.
 
 ### Known hard problems
 
-<!-- Name these unprompted — it signals domain understanding:
-     - Stateful bookings punish naive retries; a duplicate call is a duplicate
-       booking. Our duplicate-purchase guard is a partial answer.
-     - Partial itinerary failure needs rollback of the legs that succeeded.
-     - Inventory fragmentation: "the agent found the best option" is only ever
-       true relative to the inventory it can reach. -->
+Named unprompted, because they are the real ones:
+
+- **Partial-itinerary rollback.** A four-supplier recovery that fails on the
+  fourth leaves three paid. Escrow helps for the venue; it does not solve the
+  general case.
+- **Duplicate booking under retry.** Stateful bookings punish naive retries — a
+  repeated call is a repeated booking. Our duplicate-purchase guard is a partial
+  answer.
+- **Facilitator dependency.** The testnet x402 facilitator is best-effort with no
+  SLA. Production needs a contracted facilitator or our own.
+- **Availability is only as good as the registry.** "The agent found the best
+  option" is true only relative to the suppliers it can reach.
 
 ### Integration path
 
-<!-- How real inventory connects: NDC, GDS, direct hotel APIs. The x402 wrapper
-     is the only genuinely new component (~30 lines of middleware). -->
-
-### Compliance
-
-<!-- Not merchant of record. Delegated authority via preauthorised envelope.
-     Compensation recovery follows an assignment-of-claim model that existing
-     firms already operate under. -->
+Real inventory connects through venue management systems, PCO platforms and
+direct supplier APIs. **The x402 wrapper is the only genuinely new component** —
+roughly 30 lines of middleware per endpoint, which is what `vendors/`
+demonstrates.
 
 ---
 
-## Running it  `[Phase 0]`
+## Running it
+
+Reviewed on Windows with Python 3.13; Linux and macOS work identically.
+
+**Prerequisites:** Python 3.11+, git, internet access. XRPL Testnet and the t54
+facilitator are both public — **no API keys or accounts are required** to
+reproduce the run.
 
 ```bash
-git clone <repo> && cd singhacks_2026
+git clone <this-repo> && cd singhacks_2026
 pip install -r requirements.txt
-cp .env.example .env                          # add OPENAI_API_KEY
-python scripts/setup_wallets.py accounts      # 10 testnet accounts, faucet-funded
-python scripts/setup_wallets.py trustlines    # 9 RLUSD trust lines
-#  → claim 10 RLUSD at https://tryrlusd.com/ to the `session` address printed above
-uvicorn vendors.main:app --port 8001 &
-uvicorn app.main:app --port 8000
-# open http://localhost:8000
+cp .env.example .env
 ```
 
-The RLUSD claim is manual: the faucet requires GitHub sign-in and there is no API.
-It must happen **after** `trustlines`, because XRPL rejects an incoming IOU with
-`tecNO_LINE` if the receiving account has no trust line.
+`.env` works as-is for everything XRPL. `OPENAI_API_KEY` is optional — the run is
+fully deterministic without it; the model only writes narration.
 
-Between demo runs, `python scripts/setup_wallets.py recycle` sweeps RLUSD from the
-vendor accounts back to the session wallet — the vendors are our own accounts, so
-the envelope is recycled rather than consumed. Without this you get roughly one
-run per 24 hours.
+**1 · Create and fund the testnet wallets** (~1 minute, public faucet):
 
-Tests: `pytest tests/`
-
-## Repository layout
-
-```
-app/         agent, policy engine, registry, scoring, wallet, x402 client, UI
-vendors/     eight mock providers, x402-gated, one FastAPI app
-docs/        build record: one file per phase + decision log
-tests/       policy and scoring tests
-scripts/     wallet setup
+```bash
+python scripts/setup_wallets.py accounts
 ```
 
-## Build record
+Creates 10 Testnet accounts (treasury, organizer session, 8 suppliers), funds each
+with 100 XRP, and writes `wallets.json` — gitignored, never committed.
 
-Phase-by-phase implementation detail, decisions and deviations: [docs/](docs/)
+**2 · Start the supplier app**, with x402 gating enabled:
+
+```bash
+X402=1 python -m uvicorn vendors.main:app --port 8011
+```
+
+**3 · Start ContingencyOS** with real XRPL settlement, in a second terminal:
+
+```bash
+EXECUTOR=xrpl python -m uvicorn app.main:app --port 8010
+```
+
+Use `EXECUTOR=mock` for an instant run with no ledger activity — useful for
+reading the decision logic without waiting for settlement.
+
+**4 · Open** http://localhost:8010 and click **Run full demo**.
+
+A full run takes roughly two and a half minutes, most of it real settlement. Every
+row in the ledger panel links to `testnet.xrpl.org`.
+
+### Verify the claims yourself
+
+```bash
+# see a real 402 challenge, before any payment is made
+curl -i http://127.0.0.1:8011/venue/suntec-backup/verify
+
+# the engine contains no event-industry logic (docstring hits only)
+grep -rniE "venue|conference|attendee" app/*.py
+
+# policy caps and constraint scoring
+python -m pytest tests/ -q
+```
+
+**Reset between runs:** the Reset button, or `POST /reset`.
+
+### Repository layout
+
+```
+app/            engine, plan comparison, scoring, policy, escrow, x402 client, UI
+verticals/      recovery playbooks + provider registries (the domain, as data)
+profiles/       organizer contingency policies
+vendors/        eight mock suppliers: free tier + x402-gated verification tier
+scripts/        wallet setup and funding
+docs/           build record: decision log and per-phase notes
+tests/          policy and scoring tests
+```
+
+---
 
 ## Builder feedback
 
-See [FEEDBACK.md](FEEDBACK.md). Feedback hook ran throughout the build; final form
-submitted.
+Nine items reported through the hackathon feedback hook during the build, each
+with reproduction detail. The substantial ones:
+
+- The testnet RLUSD faucet is wallet-connect only with no address field, which
+  breaks scripted setup and forces a seed export into a browser extension. It then
+  failed at three separate points and never reached the ledger.
+- An enabled amendment is not a usable feature: `TokenEscrow` reports
+  `enabled: true`, but issued-token locking also requires the *issuer* to set
+  `lsfAllowTrustLineLocking`.
+- `xrpl-py` transport choice carries a ~3× latency penalty documented nowhere
+  (13.6s vs 4.6s per payment).
+- `xrpl-py` ships no crypto-condition helper despite `EscrowCreate` accepting a
+  `condition`, and `EscrowFinish` needs an `OfferSequence` the create result does
+  not return.
+- `x402-xrpl` diverges from upstream x402 header names, which breaks the MPP
+  interoperability claim — we removed that claim from this README as a result.
+- The x402 Python client is synchronous with no concurrent path, which is the
+  wrong shape for the agentic workloads x402 is promoted for.
+
+Full detail in [FEEDBACK.md](FEEDBACK.md), including draft answers for the
+builder feedback form.
+
+## Build record
+
+Every non-obvious decision, including the ones we reversed and why:
+[docs/00-decisions.md](docs/00-decisions.md).
 
 ## Team
 
-<!-- names -->
+**alternate.ai** — Wei Yan Min Oo

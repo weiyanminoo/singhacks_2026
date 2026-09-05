@@ -163,13 +163,16 @@ function planRow(e){
 function txRow(o){
   if(txCount===0) txs.innerHTML="";
   txCount++; $("#txcount").textContent=txCount+" tx";
-  const el=document.createElement(o.simulated?"div":"a");
-  el.className="row flex items-baseline gap-2 tx";
-  if(!o.simulated){ el.href=o.explorer_url+o.tx_hash; el.target="_blank"; }
-  const badge=o.simulated
+  const linkable = !o.simulated && !o.challenge;
+  const el=document.createElement(linkable?"a":"div");
+  el.className="row flex items-baseline gap-2 tx"+(o.challenge?" opacity-80":"");
+  if(linkable){ el.href=o.explorer_url+o.tx_hash; el.target="_blank"; }
+  const badge=o.challenge
+    ? `<span class="text-[9px] text-rose-400/80 border border-rose-400/30 rounded px-1">402</span>`
+    : o.simulated
     ? `<span class="text-[9px] text-amber-500/80 border border-amber-500/30 rounded px-1">sim</span>`
     : `<span class="text-[9px] text-teal-400/70">↗</span>`;
-  el.innerHTML=`<span class="text-slate-500 w-[92px] shrink-0">${o.kind}</span>
+  el.innerHTML=`<span class="${o.challenge?"text-rose-400/80":"text-slate-500"} w-[92px] shrink-0">${o.kind}</span>
     <span class="truncate flex-1 text-slate-300">${o.label}</span>
     <span class="text-slate-400 shrink-0">${o.display||""}</span>${badge}`;
   txs.appendChild(el); txs.scrollTop=txs.scrollHeight;
@@ -188,6 +191,9 @@ es.onmessage=ev=>{
       $("#spent").textContent=sgd(e.spent);
       $("#bar").style.width=Math.max(0,e.pct*100)+"%";
       $("#bar").style.background=e.pct<0.3?"var(--warn)":"var(--accent)"; break;
+    case "x402_challenge":
+      txRow({kind:"HTTP 402",label:`${e.provider} — payment required · invoice ${String(e.invoice_id||"").slice(0,10)}…`,
+             display:`${num(e.amount_drops)/1e6} ${e.asset}`,challenge:true}); break;
     case "x402":
       xrpTotal+=parseFloat(e.amount_xrp||0);
       txRow({kind:"x402 verify",label:e.provider,display:e.amount_xrp+" XRP",

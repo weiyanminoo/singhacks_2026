@@ -225,11 +225,28 @@ async def _verify_step(step, tpl, profile, providers, catalogue, ledger, wallet,
                         "detail": f"{verdict['reason']} [{verdict['rule']}]", "cost": None})
             continue
 
-        # pay for live confirmation
+        # Ask first, then pay. The unpaid probe surfaces the provider's terms so
+        # the 402 is visible rather than happening invisibly inside the SDK.
         url = VENDORS + prov["endpoint"] + "/verify"
+        if live:
+            ch = await x402_client.probe(url)
+            if ch.get("challenged"):
+                await emit({"type": "x402_challenge", "provider": prov["name"],
+                            "amount_drops": ch.get("amount_drops"),
+                            "asset": ch.get("asset"), "network": ch.get("network"),
+                            "scheme": ch.get("scheme"), "pay_to": ch.get("pay_to"),
+                            "invoice_id": ch.get("invoice_id"),
+                            "version": ch.get("x402_version")})
+                await emit({"type": "trace", "id": f"c-{prov['id']}", "status": "rejected",
+                            "text": f"HTTP 402 from {prov['name']} — payment required",
+                            "detail": f"{int(ch.get('amount_drops', 0))/1e6:g} "
+                                      f"{ch.get('asset')} to {str(ch.get('pay_to'))[:14]}… · "
+                                      f"invoice {str(ch.get('invoice_id'))[:12]}…",
+                            "cost": None})
+
         await emit({"type": "trace", "id": f"v-{prov['id']}", "status": "running",
                     "text": f"Paying for live verification — {prov['name']}",
-                    "detail": "x402", "cost": tpl["discovery"]["price_display"]})
+                    "detail": "x402 · settling on XRPL", "cost": tpl["discovery"]["price_display"]})
         res = (await x402_client.pay_and_fetch(wallet, url)) if live else \
               {"ok": True, "data": {"verified": True}, "paid": False, "tx_hash": None}
 
