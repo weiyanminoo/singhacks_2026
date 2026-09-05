@@ -1,0 +1,14 @@
+# alternate.ai — approved dependencies only. Ask before adding anything here.
+fastapi
+uvicorn
+httpx
+xrpl-py
+python-dotenv
+openai
+pytest
+
+# x402 — PACKAGE CHOICE PENDING, see docs/phase-0-setup.md.
+# CLAUDE.md names `x402-secure` (t54's Trustline risk/proxy SDK), but the official
+# XRPL x402 quickstart prescribes `x402-xrpl` (the XRPL payment scheme + FastAPI
+# middleware). These are different packages. Not installed until the call is made.
+# x402-xrpl

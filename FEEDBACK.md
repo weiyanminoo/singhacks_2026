@@ -30,6 +30,40 @@ At T+22, clean this into constructive points and submit the form.
 
 <!-- Add entries below as you hit them. Do not wait until the end. -->
 
+### [T+0] Testnet RLUSD faucet caps at 10 RLUSD/24h behind GitHub OAuth
+**Area:** RLUSD
+**What happened:** tryrlusd.com is the only testnet RLUSD faucet the docs point
+to. It requires GitHub sign-in and dispenses "10 RLUSD every 24 hours". We are
+building an agentic-payments demo whose whole thesis is a preauthorised spending
+envelope — ours is $400. There is no path to funding a realistic envelope on
+testnet, and no bulk/API option for hackathon or CI use. It also means the
+8 vendor accounts in a multi-provider demo cannot be funded to test receipt
+paths. The cap silently forces every XRPL agent-payment demo either into
+sub-$10 amounts or off real RLUSD entirely, which undercuts the "use RLUSD for
+agentic payments" story the ecosystem is pushing.
+**Time lost:** ~25 min, plus a design decision that has to be reopened.
+**What would have helped:** a higher testnet ceiling (or a request-with-reason
+form), an API endpoint so setup can be scripted, and a line in the RLUSD docs
+stating the cap up front — we only found it by loading the faucet page. Ideally
+publish the testnet RLUSD issuer address in the docs so builders can set trust
+lines before they have any balance.
+
+### [T+0] RLUSD skill docs use a checksum-invalid placeholder address
+**Area:** RLUSD / starter kit
+**What happened:** `t54-labs/rlusd-skills` `skills/rlusd-x402/SKILL.md` shows
+`--require-issuer rBvKgF3jSZWdJcwSsmoJspoXGpHUhBGurg` in a runnable example.
+That address fails base58 checksum validation — `is_valid_classic_address()`
+returns False and the node answers `actMalformed`. It reads as a real issuer
+because the surrounding command is copy-pasteable. The one real address in the
+repo (`rMxCKbEDwqr76QuheSUMdEGf4B9xJ8m5De`, in
+`use-rlusd-xrpl/references/issuer-settings.md`) is mainnet-only and not labelled
+as such next to the testnet examples.
+**Time lost:** ~15 min chasing a fake address against testnet.
+**What would have helped:** use an obviously-fake form (`rEXAMPLE...`) for
+placeholders, or real per-network addresses in a small table — mainnet issuer,
+testnet issuer, devnet issuer — since the whole point of the skill is that an
+agent will copy these verbatim.
+
 ---
 
 ## Prompts, if you're stuck on what to write

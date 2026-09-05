@@ -25,12 +25,30 @@ before you take off. A fallback designated in advance, funded in advance.*
 
 <!-- Keep this near the top. Honesty reads as confidence. -->
 
-**Real:** every XRPL transaction, the x402 payment flow, the agent's decisions,
-the policy engine, the spending controls, the failure recovery.
+**Real:** every XRPL transaction, on Testnet. The money is **genuine RLUSD** —
+Ripple's testnet stablecoin, issuer `rQhWct2fv4Vc4KRjRgMrxa8xPN9Zx9iLKV`, held on
+real trust lines. Also real: the x402 payment flow, the agent's decisions, the
+policy engine, the spending controls, the failure recovery.
 
-**Simulated:** the vendors. Six mock providers with genuinely different pricing,
+**Simulated:** the vendors. Eight mock providers with genuinely different pricing,
 inventory and latency. Travel API sandbox approval takes days and we had 24 hours.
 Integration path in [Beyond the prototype](#beyond-the-prototype).
+
+**Scaled:** the demo runs a **$10 envelope, not $400** — 1/40 scale. The public
+testnet RLUSD faucet dispenses 10 RLUSD per 24 hours, so a larger envelope cannot
+be funded with real RLUSD. We chose authentic RLUSD at small scale over a
+self-issued token at large scale. Every amount you see on the explorer is real.
+Real-world unit economics are quoted separately under
+[Beyond the prototype](#beyond-the-prototype) — notably, discovery costs ~$0.02
+per query in practice, because the price of information does not scale with the
+size of the trip. See `docs/00-decisions.md` D-009.
+
+**Not built:** conditional escrow. `TokenEscrow` is an enabled amendment, but
+locking an issued token also requires the *issuer* to set
+`lsfAllowTrustLineLocking`, and Ripple's testnet RLUSD issuer does not
+(`Flags = 0x819a0000`, verified T+0). The refundable hold is therefore a
+vendor-initiated refund `Payment`. Why escrow is the better production design is
+in [Failure handling](#failure-handling). See D-011.
 
 ---
 
@@ -87,8 +105,9 @@ Integration path in [Beyond the prototype](#beyond-the-prototype).
 <!-- The actual mechanics, step by step:
      agent selects provider from registry → GET endpoint → 402 with price →
      signs XRPL Payment → facilitator verifies → 200 with live data → ... →
-     purchase via RLUSD Payment with SourceTag + Memos → EscrowCreate for the
-     refundable hold → confirmation delivered. -->
+     purchase via RLUSD Payment with SourceTag + Memos → confirmation delivered.
+     Escrow was cut (D-011); on the failure path the refundable hold is a
+     vendor-initiated refund Payment. -->
 
 ## Architecture  `[Phase 3]`
 
@@ -100,23 +119,42 @@ Integration path in [Beyond the prototype](#beyond-the-prototype).
 
 | What | XRPL feature | Why |
 |---|---|---|
-| Spending ceiling | Funded session account | The limit is the balance, not a code check |
-| Discovery queries | `Payment` (XRP) ×8 | Sub-cent purchases card rails cannot process |
+| Spending ceiling | Session wallet's RLUSD trust line balance | The limit is the balance, not a code check |
+| Discovery queries | `Payment` (RLUSD) ×7 | Sub-cent purchases card rails cannot process |
 | Purchases | `Payment` (RLUSD) ×3 | Dollar-denominated, instant final settlement |
+| Concurrent settlement | `TicketCreate` + `TicketSequence` | 7 discovery payments in one ledger close, not seven |
 | Audit trail | `Memos` + `SourceTag` | Every tx maps to a decision and a policy rule |
-| Refundable hold | `EscrowCreate` / `Finish` / `Cancel` | Money returns when the hotel sells out |
-| Key delegation | `SetRegularKey` | Agent key rotatable, master offline |
+| Refund on failure | `Payment` (RLUSD, vendor → session) | Money returns when the hotel sells out |
+| Key delegation | `SetRegularKey` | Agent key rotatable or revocable without moving funds |
 
-<!-- Explain the two-asset choice as a design decision (see docs/00-decisions.md
-     D-002): stablecoin for value transfer where price stability matters, native
-     asset for high-frequency micropayments and conditional holds. -->
+<!-- Explain the SINGLE-asset choice as a design decision (docs/00-decisions.md
+     D-002a, which supersedes D-002). Points to make:
+     - The envelope IS the RLUSD trust line balance. One number, one ceiling.
+     - XRP in the account is operational only — reserves and ~10 drops per tx in
+       fees. Not agent-spendable: the policy engine issues RLUSD payments to
+       allowlisted registry destinations and nothing else.
+     - The sub-cent argument is about RAILS, not denomination. A $0.02 payment is
+       impossible on card networks whatever the asset settles it.
+     - D-002 (the earlier two-asset design) is kept in the decision log on
+       purpose — showing the reasoning that was revised is worth more than
+       pretending we got it right first time.
+     - Tickets: TicketBatch is a live amendment; we used it to solve a real
+       latency constraint rather than working around it with a mutex. Cross-ref
+       D-006a and the Performance section below. -->
+
+<!-- RESOLVED: escrow was cut at T+0 (D-011) because the testnet RLUSD issuer does
+     not set lsfAllowTrustLineLocking. The table row above now reads "Refund on
+     failure / Payment", which is what we actually built. Failure handling must
+     describe conditional escrow as the production design and say why it is
+     better: funds return automatically on a time bound, without depending on the
+     vendor's cooperation or solvency. -->
 
 ### Memo format
 
 ```
 SourceTag: 4021
 MemoType:  alternate/booking
-MemoData:  BK-7741|decision:d_012|rule:hotel_cap_250
+MemoData:  BK-7741|decision:d_012|rule:hotel_cap_6_25
 ```
 
 Decode: `bytes.fromhex(memo_data).decode()`
@@ -126,9 +164,11 @@ Decode: `bytes.fromhex(memo_data).decode()`
 
 ## x402 usage  `[Phase 2]`
 
-<!-- Facilitator: xrpl-x402.t54.ai. SDK: t54-labs/x402-secure, version pinned.
-     Which endpoints are gated and at what price. The free-tier pattern: free call
-     returns schema + stale sample, paid call returns live data.
+<!-- Facilitator: https://xrpl-facilitator-testnet.t54.ai (network xrpl:1).
+     SDK: x402-xrpl (PyPI), version pinned - NOT x402-secure, see D-010.
+     Which endpoints are gated and at what price — priced in RLUSD (~$0.02/call),
+     not XRP drops, per D-002a. The free-tier pattern: free call returns schema +
+     stale sample, paid call returns live data.
      Interoperability: MPP is backwards-compatible with x402, so an MPP client
      could consume our endpoints unchanged. -->
 
@@ -161,8 +201,8 @@ Full log: [TRANSACTIONS.md](TRANSACTIONS.md)
 |---|---|
 | **Transparency** | Streaming decision trace: every query, price, option considered, option rejected and why, running budget |
 | **Authorisation** | In-policy and under cap: autonomous. Over cap or out of policy: single-tap approval with the reason stated. Never autonomous: changing the envelope, adding a provider |
-| **Spending controls** | The session wallet holds exactly the envelope. Per-transaction, per-category and per-session caps. The ceiling is the balance, not a code check |
-| **Security** | Treasury separate from session wallet; agent signs with a rotatable regular key; providers allowlisted in the registry |
+| **Spending controls** | The session wallet holds exactly the envelope in RLUSD, and every purchase is an RLUSD payment to an allowlisted vendor — so the ceiling is the balance, not a code check. The account's small XRP balance covers fees and reserves and is not agent-spendable. Per-transaction, per-category and per-session caps sit inside that hard ceiling |
+| **Security** | Treasury separate from session wallet; agent signs with a regular key that can be rotated or disabled without moving funds; providers allowlisted in the registry |
 | **Traceability** | Every tx memo carries a decision reference; the receipt ledger maps tx ↔ decision ↔ policy rule ↔ booking reference |
 | **Failure handling** | See below — demonstrated live in the video |
 | **Safeguards** | Provider allowlist, duplicate-purchase guard (cannot book two hotels for one night), max actions per incident, kill switch |
@@ -170,6 +210,13 @@ Full log: [TRANSACTIONS.md](TRANSACTIONS.md)
 <!-- Add a paragraph mapping this onto the OpenWallet Standard: delegated agent
      access and policy-gated signing are precisely this control layer, and
      production would use it rather than a bespoke key setup. -->
+
+<!-- STATE HONESTLY (docs/00-decisions.md D-008): SetRegularKey demonstrates key
+     delegation on ledger, and the regular key can be rotated or disabled without
+     moving funds. Offline master-key custody is INTENDED PRODUCTION DESIGN and is
+     NOT demonstrated here — the master seed is in .env on the demo machine.
+     Do not write "the master key stays offline." Saying what we did not do is
+     what makes the rest of this table credible. -->
 
 ## Failure handling  `[Phase 4]`
 
@@ -217,7 +264,8 @@ alternate.ai applies wherever four things are true:
      The positioning point worth stating loudly: we take NO margin on what the
      agent buys, because the moment we profit from its choices nobody trusts it
      to spend their money.
-     Unit economics: ~$0.16 discovery + ~$0.10 inference + settlement fees. -->
+     Unit economics: ~$0.14 discovery (7 × $0.02) + ~$0.10 inference +
+     settlement fees. -->
 
 ---
 
@@ -227,19 +275,37 @@ alternate.ai applies wherever four things are true:
 
 ### Cost
 
-<!-- Per recovery, broken down. Cite fee and reserve values from
-     xrpl-fee-settings.json — do not hardcode or guess. -->
+<!-- Per recovery, broken down. Present BOTH, per docs/00-decisions.md D-007:
+     - Testnet actuals: what this run actually cost, read live from our own node
+       (server_info / server_state).
+     - Mainnet projection: what it would cost on mainnet today, cited from
+       resources/xrpl-fee-settings.json (live mainnet state via xrpscan).
+     Presenting both is stronger than either alone, and it is exactly what the
+     Feasibility criterion asks for. Do not hardcode or guess either set. -->
 
 ### Performance
 
 <!-- Latency budget for the 90-second target: discovery round trips, x402
-     settlement time, LLM inference. Where the time actually goes. -->
+     settlement time, LLM inference. Where the time actually goes.
+
+     LEAD WITH THE TICKETS RESULT (docs/00-decisions.md D-006a). The story:
+     the happy path is ~13 transactions; at a ~3-5s ledger close, fully
+     serialised settlement burns 40-65s before a single LLM token is generated,
+     against a 90s target. We pre-allocate tickets with TicketCreate and fire the
+     discovery leg concurrently with TicketSequence set and Sequence: 0, which
+     collapses that leg from ~35s to about one ledger close. Per-account locks,
+     not one global lock, because sequence collisions are per-account.
+     Give the measured before/after numbers from a real run.
+     If we fell back to per-account locks, say so plainly and describe tickets as
+     the intended design. -->
 
 ### Scalability and reliability
 
 <!-- What breaks at 10,000 concurrent disruptions. Sequence handling per wallet
-     (see docs/00-decisions.md D-006). The testnet facilitator is best-effort with
-     no committed SLA; we pinned a version. What production would need. -->
+     (see docs/00-decisions.md D-006a, which supersedes D-006). The testnet
+     facilitator is best-effort with no committed SLA; we pinned a version.
+     What production would need: ticket pools sized per wallet, and one session
+     wallet per active incident rather than a shared account. -->
 
 ### Known hard problems
 
@@ -266,14 +332,25 @@ alternate.ai applies wherever four things are true:
 ## Running it  `[Phase 0]`
 
 ```bash
-git clone <repo> && cd alternate-ai
-cp .env.example .env               # add your testnet seeds
+git clone <repo> && cd singhacks_2026
 pip install -r requirements.txt
-python scripts/setup_wallets.py    # fund + trust lines
+cp .env.example .env                          # add OPENAI_API_KEY
+python scripts/setup_wallets.py accounts      # 10 testnet accounts, faucet-funded
+python scripts/setup_wallets.py trustlines    # 9 RLUSD trust lines
+#  → claim 10 RLUSD at https://tryrlusd.com/ to the `session` address printed above
 uvicorn vendors.main:app --port 8001 &
 uvicorn app.main:app --port 8000
 # open http://localhost:8000
 ```
+
+The RLUSD claim is manual: the faucet requires GitHub sign-in and there is no API.
+It must happen **after** `trustlines`, because XRPL rejects an incoming IOU with
+`tecNO_LINE` if the receiving account has no trust line.
+
+Between demo runs, `python scripts/setup_wallets.py recycle` sweeps RLUSD from the
+vendor accounts back to the session wallet — the vendors are our own accounts, so
+the envelope is recycled rather than consumed. Without this you get roughly one
+run per 24 hours.
 
 Tests: `pytest tests/`
 
@@ -281,7 +358,7 @@ Tests: `pytest tests/`
 
 ```
 app/         agent, policy engine, registry, scoring, wallet, x402 client, UI
-vendors/     six mock providers, x402-gated, one FastAPI app
+vendors/     eight mock providers, x402-gated, one FastAPI app
 docs/        build record: one file per phase + decision log
 tests/       policy and scoring tests
 scripts/     wallet setup

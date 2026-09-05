@@ -1,0 +1,21 @@
+# Secrets — never commit
+.env
+*.seed
+wallets.json
+
+# Local agent-skill install artifact.
+# .claude/skills/xrpl-agentic-resources is a junction to skills/xrpl-agentic-resources,
+# so git would otherwise track the whole skill twice and double every refresh diff.
+# Reproduce it with: bash skills/install.sh   (then re-link, see docs/phase-0-setup.md)
+.claude/skills/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# OS
+Thumbs.db
+.DS_Store

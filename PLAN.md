@@ -13,12 +13,23 @@ not done until all three are done.
 
 ## Roles
 
-- **Person A — the money spine.** XRPL wallets, payments, escrow, memos, the
-  vendor app, x402 both sides, receipt ledger.
-- **Person B — the brain and the face.** Agent orchestration, registry, policy
-  engine, scoring, SSE, UI, approval flow.
+The A/B split below describes **workstreams, not people**. It assumed two humans
+building in parallel against stubs; with Claude Code as the implementer that is
+the wrong shape. Keep the labels — they usefully mark dependency order within a
+phase — but work like this:
 
-Person B works against stubs from minute one. Person A replaces them underneath.
+- **Claude Code implements sequentially**, phase by phase, in dependency order.
+  Within a phase, do Person A's items before Person B's where B depends on A;
+  otherwise the order is Claude's call.
+- **Human 1 drives.** Reviews each phase against its success criteria, makes the
+  call whenever Claude flags an ambiguity, runs the demo dry runs.
+- **Human 2 works in parallel on what Claude is not touching:** README prose, the
+  architecture diagram, `DEMO.md` narration, screenshots, and the Reachability
+  and Commercial sections — none of which need code.
+
+**Stub-first still applies inside Claude's own work.** Build `x402_client` stubs
+returning fake hashes so the agent logic and UI can be developed and tested before
+the real payment path lands.
 
 ---
 
@@ -26,17 +37,34 @@ Person B works against stubs from minute one. Person A replaces them underneath.
 
 Nothing else starts until this is done.
 
-- [ ] `bash skills/install.sh`
-- [ ] `bash skills/xrpl-agentic-resources/scripts/refresh.sh`
-- [ ] Install the feedback hook from `agent-instruction.md` — **10% of grade**
-- [ ] Read https://xrpl-x402.t54.ai/#setup
-- [ ] Create 2 testnet accounts (treasury, session), fund generously from faucet
-- [ ] Get testnet RLUSD from https://tryrlusd.com/, set trust lines
-- [ ] Verify one payment + one escrow round-trip via `xrpl-up` CLI, before any app code
-- [ ] Repo skeleton, `.env.example`, `docs/`, `TRANSACTIONS.md`, `FEEDBACK.md`
-- [ ] Both read the interface contract in `CLAUDE.md` out loud and agree it
+> ~~`bash skills/install.sh`~~ — **done, do not re-run.** Under MSYS on Windows
+> `ln -s` deep-copies instead of linking, so re-running replaces the working
+> junctions with copies that `refresh.sh` will never update.
+> ~~Install the feedback hook~~ — **done**, verified with a live 201 submission.
 
-**Success:** wallets funded, RLUSD held, one CLI-verified payment on the explorer,
+- [ ] `bash skills/xrpl-agentic-resources/scripts/refresh.sh`
+- [ ] Read https://xrpl-x402.t54.ai/#setup
+- [ ] Confirm `xrpl-up` installs on Windows; if not, fall back to an `xrpl-py`
+      script (this phase gates on the tool, so establish it early)
+- [ ] Create 2 testnet accounts (treasury, session), fund generously from faucet
+- [ ] Get testnet RLUSD from https://tryrlusd.com/
+- [ ] **Set the RLUSD trust line on the session wallet** (envelope = this balance)
+- [ ] **`scripts/setup_wallets.py`: 8 vendor accounts + 8 `TrustSet` transactions**
+      — every vendor must hold an RLUSD trust line, since all spending is now
+      RLUSD (D-002a). One-time, scripted.
+- [x] **Escrow asset check** — DONE. Issuer `rQhWct2fv4Vc4KRjRgMrxa8xPN9Zx9iLKV`
+      has `Flags = 0x819a0000`; `lsfAllowTrustLineLocking` is **NOT set**, so
+      token escrow is unavailable. Cut-list item 1 executed → refund-`Payment`
+      fallback. Recorded as D-011.
+- [ ] Verify **one RLUSD payment** via `xrpl-up`, before any app code
+- [x] `.env.example` (incl. `OPENAI_API_KEY`), `requirements.txt`, `.gitignore`
+      covering `.env` / `__pycache__` / `wallets.json` / `.claude/skills/`
+- [ ] Both read the interface contract in `CLAUDE.md` out loud and agree it
+      (note: `create_hold()` is replaced by `refund()` — the one contract change,
+      forced by D-011)
+
+**Success:** wallets funded, RLUSD held on session + all 8 vendors, one
+CLI-verified **RLUSD** payment on the explorer, escrow asset question answered,
 hook running, both people agree the contract.
 
 **Write:** `docs/phase-0-setup.md` — account addresses and roles, exact faucet and
@@ -49,10 +77,17 @@ trust line steps, anything that did not work first time.
 
 **Person A**
 - [ ] `xrpl_ops.py`: connect, sign, submit, wait for validation
-- [ ] Sequence serialization (async lock) — **do this now, not later**
+- [ ] **Per-account locks (not one global lock) + `TicketCreate`** — pre-allocate 8
+      tickets on the session wallet; discovery fires concurrently with
+      `TicketSequence` set and `Sequence: 0` (D-006a). **Do this now, not later.**
+      Verify `TicketBatch` on testnet first. If tickets are not working by the end
+      of this phase, fall back to per-account locks, record it, and move on —
+      Phase 2 is not to be spent on this.
 - [ ] Ripple-epoch helper (`unix_to_ripple(ts) = ts - 946684800`)
 - [ ] One RLUSD `Payment` with `SourceTag` + `Memos`, landed and verified
-- [ ] Fee/reserve values read from `xrpl-fee-settings.json`, not hardcoded
+- [ ] Fee/reserve values read **live from our own node** (`server_info` /
+      `server_state`), not hardcoded and **not** from the mainnet JSON snapshot
+      (D-007)
 
 **Person B**
 - [ ] FastAPI app, `/stream` SSE endpoint
@@ -76,14 +111,17 @@ their source.
 ## Phase 2 — The paid loop (T+3 → T+7)
 
 **Person A**
-- [ ] `vendors/main.py`: one FastAPI app, routers for `/flights/skyline`,
-      `/hotels/aurora`, `/data/status`
-- [ ] x402-gate them via `x402-secure`, priced in XRP drops
+- [ ] `vendors/main.py`: one FastAPI app, data-driven handlers, routers for
+      `/flights/skyline`, `/hotels/aurora`, `/data/status`
+- [ ] x402-gate them via **`x402-xrpl`** (not `x402-secure` — different packages,
+      D-010), **priced in RLUSD**. Demo scale $0.0005/call; confirm the facilitator
+      has no minimum above that, and if it does, raise toward $0.02 (D-009)
 - [ ] `x402_client.py`: real 402 challenge → pay → retry
 - [ ] Free tier on data endpoints returns schema + stale sample; paid returns live
 
 **Person B**
-- [ ] `registry.py`: 6 providers with id, capability, endpoint, price, reliability
+- [ ] `registry.py`: **8 providers** (2 flight, 3 hotel, 2 ground, 1 status/waiver)
+      with id, capability, endpoint, price, reliability
 - [ ] `agent.py`: objective parsing → provider selection → query loop
 - [ ] `policy.py`: per-tx cap, category cap, envelope cap, approval threshold,
       duplicate-purchase guard
@@ -105,9 +143,13 @@ the free-tier pattern, the registry schema.
 ## Phase 3 — The full journey (T+7 → T+11)
 
 **Person A**
-- [ ] Remaining 3 vendor routers with genuinely different price/inventory/latency
-- [ ] `EscrowCreate` for the hotel hold; `EscrowFinish` on check-in;
-      `EscrowCancel` path
+- [ ] Remaining 5 vendor routers with genuinely different price/inventory/latency
+      (8 total)
+- [ ] ~~Escrow round-trip~~ — **CUT at T+0 (D-011).** The testnet RLUSD issuer does
+      not set `lsfAllowTrustLineLocking`, so token escrow is unavailable. Build the
+      **vendor-initiated refund `Payment`** instead: vendor returns the RLUSD to
+      the session wallet, agent reroutes. Do not build `EscrowCreate`/`Finish`/
+      `Cancel`.
 - [ ] `SetRegularKey` on the session wallet
 - [ ] `receipts.py`: JSON ledger mapping tx_hash ↔ decision_id ↔ policy_rule ↔ booking_ref
 
@@ -115,17 +157,20 @@ the free-tier pattern, the registry schema.
 - [ ] **The dependency chain** — this is the centrepiece:
       flight time decided → constrains hotel choice → constrains car timing
 - [ ] Search-vs-commit decision: the agent explicitly reasons about whether one
-      more $0.02 query is worth the time given decaying inventory
+      more $0.02 query is worth the time given decaying inventory. **This is the
+      8th registered provider being declined** — a real registry entry the agent
+      evaluates and turns down, visible in the trace with the stated reason.
+      Decide here which of the 8 it is, from the run.
 - [ ] At least one **rejected** option shown with the reason
-      (e.g. "$310 Aurora Grand meets all criteria but breaks $250 cap")
+      (e.g. "$7.75 Aurora Grand meets all criteria but breaks the $6.25 cap")
 - [ ] `/approve` page: pending approval, two buttons, resolves the block
 - [ ] Explorer links rendered inline next to each purchase in the UI
 - [ ] Reset button
 
 ### ✅ MILESTONE M3 (T+11) — THE CRITICAL ONE
 **The full happy path runs start to finish in under 2 minutes:** cancellation →
-8 discovery payments → dependent decisions → 3 purchases → confirmations →
-envelope drained → all hashes visible and clickable.
+7 discovery payments (8th provider declined, visibly) → dependent decisions →
+3 purchases → confirmations → envelope drained → all hashes visible and clickable.
 
 *If M3 slips past T+12: cut items 3 and 4, go straight to Phase 5.*
 
@@ -143,8 +188,9 @@ journey*, *Architecture*, *Transaction hashes* table.
 what you broke at hour 18 is the classic way to lose.
 
 **Person A (T+14 → T+17)**
-- [ ] Failure path: vendor returns sold-out AFTER payment → escrow cancel /
-      refund → agent reroutes → only the second option is paid
+- [ ] Failure path: vendor returns sold-out AFTER payment → vendor-initiated
+      refund `Payment` (D-011, escrow cut) → agent reroutes → only the second
+      option is paid
 - [ ] `tests/test_policy.py`: cap enforcement, approval threshold, duplicate guard
 - [ ] `tests/test_scoring.py`: constraint scoring picks the right option
 
@@ -176,8 +222,10 @@ polish plus the two long-form sections.
 - [ ] Architecture diagram, final
 - [ ] Transaction hash table with explorer links, verified live
 - [ ] **Feasibility / Beyond the prototype** (20% of grade): cost per recovery
-      broken down (~$0.16 discovery + ~$0.10 inference + settlement fees *cited
-      from `xrpl-fee-settings.json`*), latency budget, what breaks at 10k
+      broken down (~$0.14 discovery (7 × $0.02) + ~$0.10 inference + settlement
+      fees — testnet actuals read live from our node **and** the mainnet
+      projection cited from `xrpl-fee-settings.json`, per D-007), latency budget
+      (lead with the tickets result, D-006a), what breaks at 10k
       concurrent disruptions, real integration path (NDC/GDS/direct hotel APIs),
       reliability caveats incl. the testnet facilitator being best-effort, and
       the **duplicate-booking / partial-itinerary rollback problem** named
@@ -222,9 +270,15 @@ known gaps. Honest.
 When a milestone slips, cut the next item. No "give me one more hour."
 **Record every cut in `docs/00-decisions.md`.**
 
-1. **Escrow** → plain `Payment` instead. README describes the escrow design and
-   the transaction shape we would have used.
-2. **Vendor endpoints 5 and 6** → four providers is still a real comparison.
+1. ~~**Escrow**~~ — **ALREADY EXECUTED at T+0 (D-011)**, forced by the issuer flag
+   rather than by time. → **vendor-initiated refund `Payment`** back to the session
+   wallet.
+   Visually this demonstrates the same thing: agent pays, vendor is sold out,
+   money returns, agent reroutes. The README then states plainly that conditional
+   escrow is the production design, and why — funds return automatically, without
+   requiring the vendor's cooperation.
+2. **Vendor endpoints 7 and 8** → six providers is still a real comparison. Keep
+   the declined-provider moment by declining one of the remaining six.
 3. **The car booking leg** → keep flight → hotel. The dependency chain survives
    with two legs.
 4. **The approval prompt** → describe it in the README, don't build it.
