@@ -7,21 +7,24 @@ explicitly requires transaction hashes or explorer references.
 Network: **XRPL Testnet**
 Explorer: `https://testnet.xrpl.org/transactions/{hash}`
 
-**Scale note (D-009, D-012):** the demo runs a **$10 envelope**, not $400, because
-the public testnet RLUSD faucet caps at 10 RLUSD/24h. Purchases scale 1/40;
-discovery stays at the real **$0.02/query**. Every amount below is real RLUSD.
+**Scale note (D-009, D-012, D-016):** the demo runs a **10 XRP envelope**, not
+$400. Purchases scale 1/40; discovery stays unscaled at 0.02 per query.
+**Settlement is XRP, not RLUSD** — the testnet RLUSD faucet never dispensed
+(D-016), so every account holds 0.00 RLUSD. The RLUSD trust lines below are real
+and remain in place as evidence of the attempt. The UI renders amounts with a $
+sign for legibility; the ledger moves XRP. Do not present these as dollars.
 
 ---
 
 ## Accounts
 
 Real testnet accounts, created and funded T+0 by `scripts/setup_wallets.py`.
-All hold 100 XRP (operational: reserves + fees) and an RLUSD trust line.
+All hold 100 XRP and an RLUSD trust line (set successfully, never funded).
 
 | Role | Address | Purpose |
 |---|---|---|
 | Treasury | `rQwmdaTDK2MkgjMmkcAXCAuRx3o4BpJL3j` | Holds the float. Never touched by the agent. |
-| Session wallet | `r9Pwpy1iBRXFEeZdn8ix51tUJfoj2PCwD8` | Funded with exactly the envelope. **The spending ceiling is this RLUSD balance.** |
+| Session wallet | `r9Pwpy1iBRXFEeZdn8ix51tUJfoj2PCwD8` | **The spending ceiling is this XRP balance.** |
 | Vendor: Skyline Air | `rwqggQdGuh8iPGJiBZLsTGP4GhytVukGeR` | Flight inventory + booking |
 | Vendor: AeroConnect | `rn5D1RfpZine6vuSwT6VnQkT9mmjffW6ET` | Flight inventory + booking |
 | Vendor: Aurora Grand | `r4tdKneC9ebjXYrdfpwiL9qLXZ9P9eWuqK` | Hotel inventory + booking |
@@ -45,11 +48,11 @@ from the demo run below.
 
 | # | What it demonstrates | Type | Hash | Link |
 |---|---|---|---|---|
-| 1 | Envelope funding — the spending ceiling | Payment (RLUSD) | | |
-| 2 | Discovery micro-payment via x402 | Payment (RLUSD) | | |
-| 3 | Autonomous purchase with decision memo | Payment (RLUSD) | | |
+| 1 | Envelope funding — the spending ceiling | Payment (XRP) | | |
+| 2 | Discovery micro-payment via x402 | Payment (XRP) | | |
+| 3 | Autonomous purchase with decision memo | Payment (XRP) | | |
 | 4 | Concurrent discovery leg via pre-allocated tickets | TicketCreate | | |
-| 5 | Failure recovery — vendor refund, agent reroutes | Payment (RLUSD) | | |
+| 5 | Failure recovery — vendor refund, agent reroutes | Payment (XRP) | | |
 | 6 | Agent key delegation | SetRegularKey | | |
 
 ---
@@ -63,7 +66,7 @@ in the README.
 
 | Time | Action | Type | Amount | Hash |
 |---|---|---|---|---|
-| | Fund session wallet | Payment | $10.00 RLUSD | |
+| | Fund session wallet | Payment | 10 XRP | |
 | | Pre-allocate discovery tickets | TicketCreate | — | |
 | | Delegate signing to agent | SetRegularKey | — | |
 
@@ -71,16 +74,16 @@ in the README.
 
 | # | Provider | Endpoint | Price | Hash |
 |---|---|---|---|---|
-| 1 | Skyline Air | `/flights/skyline/availability` | $0.02 RLUSD | |
-| 2 | AeroConnect | `/flights/aeroconnect/availability` | $0.02 RLUSD | |
-| 3 | Status Feed | `/data/status/waivers` | $0.02 RLUSD | |
-| 4 | Aurora Grand | `/hotels/aurora/availability` | $0.02 RLUSD | |
-| 5 | Transit Inn | `/hotels/transit-inn/availability` | $0.02 RLUSD | |
-| 6 | Meridian | `/hotels/meridian/availability` | $0.02 RLUSD | |
-| 7 | SwiftCar | `/ground/swiftcar/eta` | $0.02 RLUSD | |
+| 1 | Skyline Air | `/flights/skyline/availability` | 0.02 XRP | |
+| 2 | AeroConnect | `/flights/aeroconnect/availability` | 0.02 XRP | |
+| 3 | Status Feed | `/data/status/waivers` | 0.02 XRP | |
+| 4 | Aurora Grand | `/hotels/aurora/availability` | 0.02 XRP | |
+| 5 | Transit Inn | `/hotels/transit-inn/availability` | 0.02 XRP | |
+| 6 | Meridian | `/hotels/meridian/availability` | 0.02 XRP | |
+| 7 | SwiftCar | `/ground/swiftcar/eta` | 0.02 XRP | |
 | — | **MetroLink — DECLINED** | `/ground/metrolink/eta` | not paid | — |
 
-**Discovery total:** _____ RLUSD across 7 transactions
+**Discovery total:** _____ XRP across 7 transactions
 
 > The 8th provider the agent *chose not to query* is the search-vs-commit
 > decision. Record which one and the stated reason here: _____
@@ -106,9 +109,9 @@ vendor-initiated refund `Payment`. See the failure path below and D-011.
 
 | Step | Type | Hash | Notes |
 |---|---|---|---|
-| Payment to sold-out vendor | Payment (RLUSD) | | Vendor reported no inventory after settlement |
-| Refund returned to session wallet | Payment (RLUSD) | | Vendor-initiated; escrow is the production design |
-| Reroute purchase | Payment (RLUSD) | | Second-best option booked |
+| Payment to sold-out vendor | Payment (XRP) | | Vendor reported no inventory after settlement |
+| Refund returned to session wallet | Payment (XRP) | | Vendor-initiated; escrow is the production design |
+| Reroute purchase | Payment (XRP) | | Second-best option booked |
 
 ---
 
