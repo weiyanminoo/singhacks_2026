@@ -195,6 +195,29 @@ Two follow-ons:
    $0.0005. If it does, discovery pricing moves back toward $0.02 and the
    envelope split changes.
 
+### D-013 · Cut-list reorder — car booking now cut before providers
+**Date/time:** T+0
+**Context:** D-011 spent cut-list item 1 (escrow) on day one, forced by a protocol
+constraint rather than a schedule slip. That promoted "vendor endpoints 7 and 8"
+to the front of the queue — meaning the next slip would drop us from 8 providers
+to 6, directly undercutting the 8-registered / 7-queried / 1-declined structure
+pinned in D-004a.
+**Decision:** Swap items 2 and 3. The **car booking leg** is now cut before
+**vendor endpoints 7 and 8**.
+**Alternatives considered:** Leaving the order (would trade away search breadth,
+a core thesis pillar, before trading away a repeated demonstration).
+**Consequence:** The two cuts are not equivalent, which is why order matters. The
+car is the **terminal node** of flight → hotel → car: nothing depends on it, so
+cutting it *shortens* the chain rather than breaking it, and flight → hotel still
+demonstrates that one decision constrains the next. Cutting providers instead
+attacks a different pillar — "checking 7 options instead of 2 is what finds the
+cheap hotel" — and weakens the declined-provider moment that carries the
+search-vs-commit story.
+**Mitigation if the car is cut:** the car leg is where a *timing* constraint bites
+(arrival time → when the car comes), while the hotel leg is mostly budgetary. Give
+the hotel decision a time constraint as well — a late check-in cutoff driven by the
+flight's arrival — so temporal dependency survives in a two-link chain.
+
 ### D-012 · Discovery stays at the real $0.02/query; only purchases scale
 **Refines:** [D-009](#d-009--demo-runs-at-140-scale-on-real-rlusd--10-envelope-not-400).
 **Date/time:** T+0

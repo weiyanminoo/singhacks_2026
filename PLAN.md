@@ -278,10 +278,16 @@ When a milestone slips, cut the next item. No "give me one more hour."
    money returns, agent reroutes. The README then states plainly that conditional
    escrow is the production design, and why — funds return automatically, without
    requiring the vendor's cooperation.
-2. **Vendor endpoints 7 and 8** → six providers is still a real comparison. Keep
-   the declined-provider moment by declining one of the remaining six.
-3. **The car booking leg** → keep flight → hotel. The dependency chain survives
-   with two legs.
+2. **The car booking leg** *(promoted above providers at T+0, D-013)* → keep
+   flight → hotel. The car is the **terminal node** of the dependency chain, so
+   removing it shortens the chain rather than breaking it; a two-link chain still
+   proves that one decision constrains the next.
+   **If cut, give the hotel decision a time constraint** (e.g. a late check-in
+   cutoff driven by the flight's arrival), so the *temporal* dependency the car
+   leg demonstrated survives in the hotel leg. Costs nothing to build.
+3. **Vendor endpoints 7 and 8** *(demoted, D-013)* → six providers is still a real
+   comparison. Keep the declined-provider moment by declining one of the remaining
+   six.
 4. **The approval prompt** → describe it in the README, don't build it.
 5. **`SetRegularKey`** → mention as intended production design.
 
