@@ -172,8 +172,13 @@ Decode: `bytes.fromhex(memo_data).decode()`
      Which endpoints are gated and at what price — priced in RLUSD (~$0.02/call),
      not XRP drops, per D-002a. The free-tier pattern: free call returns schema +
      stale sample, paid call returns live data.
-     Interoperability: MPP is backwards-compatible with x402, so an MPP client
-     could consume our endpoints unchanged. -->
+     Interoperability - STATE THIS CAREFULLY. We verified that x402-xrpl 0.3.2
+     uses PAYMENT-SIGNATURE / PAYMENT-REQUIRED / PAYMENT-RESPONSE headers, NOT
+     the upstream x402 X-PAYMENT spelling. So "an MPP client could consume our
+     endpoints unchanged" is FALSE as it stands and must not be claimed. What is
+     true: the challenge body is spec-shaped (x402Version 2, accepts[], scheme
+     exact, network xrpl:1), so interop is a header-mapping shim, not a protocol
+     gap. Say that instead - it is both honest and still a good answer. -->
 
 ## XRPL AI Starter Kit / agent skill integration  `[Phase 2]`
 

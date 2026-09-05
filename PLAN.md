@@ -230,8 +230,10 @@ polish plus the two long-form sections.
       reliability caveats incl. the testnet facilitator being best-effort, and
       the **duplicate-booking / partial-itinerary rollback problem** named
       explicitly
-- [ ] One line on interoperability: MPP is backwards-compatible with x402, so an
-      MPP client could consume our endpoints unchanged
+- [ ] Interoperability line — do NOT claim an MPP client works unchanged; the
+      headers diverge from upstream x402 (PAYMENT-SIGNATURE vs X-PAYMENT,
+      verified T+4). Claim what is true: the challenge body is spec-shaped, so
+      interop is a header shim rather than a protocol gap
 
 **Person B finishes:**
 - [ ] Problem (3 paragraphs, no jargon)

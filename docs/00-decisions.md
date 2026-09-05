@@ -195,6 +195,48 @@ Two follow-ons:
    $0.0005. If it does, discovery pricing moves back toward $0.02 and the
    envelope split changes.
 
+### D-016 · Settle in XRP — the RLUSD faucet never delivered
+**Supersedes the asset choice in:** [D-002a](#d-002a--single-asset-envelope--all-agent-spending-in-rlusd) and [D-009](#d-009--demo-runs-at-140-scale-on-real-rlusd--10-envelope-not-400). The single-asset principle stands; the asset changes.
+**Date/time:** T+4
+**Context:** D-009 committed to genuine RLUSD at 1/40 scale. After a full setup —
+issuer found, 9 trust lines set and confirmed on ledger, wallet imported into
+Crossmark on Testnet — the faucet never dispensed. It hung on a trust line that
+already existed and could not detect, then failed with a generic
+`PREPARATION ERROR`. Nothing ever reached the ledger. Audited balances confirm
+**0.00 RLUSD on all 10 accounts**.
+**Decision:** Settle in **XRP**. Single-asset still holds; the envelope is the
+session wallet's XRP balance.
+**Alternatives considered:** Continuing to chase the faucet (unbounded, and
+outside our control); issuing our own stablecoin (rejected earlier by the team,
+and now redundant since XRP is simpler than either).
+**Consequence:** XRP needs no trust line and x402 supports it natively, so the
+integration is *simpler* than the RLUSD path, not a degradation. Mechanically
+nothing else changes: same Payment, same SourceTag, same memos, same tickets.
+We keep the RLUSD trust lines in place — they stay visible on the explorer as
+evidence the attempt was real, which is the honest framing for the README. The
+cost is dollar legibility: the UI reads `$10.00` where the ledger moves 10 XRP.
+That must be labelled accurately, never implied to be dollars.
+
+### D-017 · x402 header names diverge from upstream — MPP interop claim withdrawn
+**Date/time:** T+4
+**Context:** The README carried the line "MPP is backwards-compatible with x402,
+so an MPP client could consume our endpoints unchanged" — encouraged by the
+challenge materials. Gating our endpoints with `x402-xrpl` 0.3.2 produced a
+correct-looking challenge (`x402Version: 2`, `accepts[]`, `scheme: exact`,
+`network: xrpl:1`, amount in drops, `payTo`, `invoiceId`, `sourceTag`) but the
+error read `PAYMENT-SIGNATURE header is required`. The package uses
+`PAYMENT-SIGNATURE` / `PAYMENT-REQUIRED` / `PAYMENT-RESPONSE`; upstream x402
+uses `X-PAYMENT` / `X-PAYMENT-RESPONSE`.
+**Decision:** Withdraw the claim. A client built to the upstream spec sends
+`X-PAYMENT` and fails. Replace it with what is true: the challenge *body* is
+spec-shaped, so interop is a header-mapping shim, not a protocol gap.
+**Alternatives considered:** Keeping the line (it is simply false as written);
+building the shim ourselves (out of scope, and it would not make the ecosystem
+claim true for anyone else).
+**Consequence:** A smaller, accurate interoperability claim instead of a large
+false one — exactly the rule that no README claim may outrun the repo. Reported
+upstream via the feedback hook.
+
 ### D-015 · Pivot — generic contingency engine, domain lives in data
 **Date/time:** T+3
 **Context:** The product was a flight-disruption recovery agent. Two problems: it

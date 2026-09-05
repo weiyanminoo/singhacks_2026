@@ -135,6 +135,35 @@ Raw running log. Newest at the bottom. Copy each hash here the moment it lands.
 [HH:MM] <type> <amount> <purpose> <hash>
 ```
 
+### T+4 · Phase 3 — agent purchases settled on XRPL, end to end
+
+Settled in **XRP** (D-016): the testnet RLUSD faucet never dispensed, so all
+accounts hold 0.00 RLUSD. Trust lines remain in place as evidence of the attempt.
+
+Every payment carries `SourceTag: 4021` and a memo tying it to the decision and
+the policy rule that permitted it. Decoded from the first one:
+
+```
+MemoType  alternate/booking
+MemoData  sky-0844|decision:d_rebook_transport|rule:approval_threshold
+```
+
+| Step | Amount | Hash |
+|---|---|---|
+| Rebook transport (Skyline SQ0844) | 4.6 XRP | `57231C3918A5228F330BAC23940CC94B048F9D1D300389248228237BCB0DF8CA` |
+| Overnight stay (Transit Inn) | 1.95 XRP | `5C0A11EE86B4DF8096B7E3E2F6DE2590E18AC8FF816A591B4E713C3AE86F75CF` |
+| Ground transfer (SwiftCar) | 0.49 XRP | `8A00233D27BF3AE88A1542BEC4B06515848BED6267A4880FB1E2EE8FE00F543C` |
+
+Second full run, same playbook, independently settled:
+`2F37CBDDB05D886511B0760C72AE25666A92F28FCDBF77762732B88191B1AF22` ·
+`0D268053388B21C3EBBAF42A2C3FE8779BD2C42C60D243D21690D5B5DE55DC6A` ·
+`ACE522A79138366D028EDF1CCD04297E23ADBAC922FD53988C37CB1F5FE89908`
+
+**x402 gating verified** on all 8 supplier endpoints — an unpaid GET returns a
+real 402 with `x402Version: 2`, `scheme: exact`, `network: xrpl:1`, amount in
+drops, and each supplier's own `payTo` address. Each endpoint is gated to its own
+wallet: there is no merchant of record in the middle.
+
 ### T+1 · Phase 1 verification — payments, memos, tickets, concurrency
 
 All XRP (RLUSD amount type still pending the faucet claim). Every one carries

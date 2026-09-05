@@ -44,6 +44,20 @@ def fire(vertical: str, event_id: str) -> dict:
     raise KeyError(f"no event {event_id}")
 
 
+def _clear_pending(vertical: str, event_id: str) -> None:
+    """Consume the event in the source.
+
+    Without this a leftover `pending: true` survives a restart and replays the
+    whole recovery the moment the server boots — which during a demo looks like
+    the agent firing on its own.
+    """
+    doc = yaml.safe_load(_path(vertical).read_text(encoding="utf-8"))
+    for e in doc["events"]:
+        if e["id"] == event_id:
+            e["pending"] = False
+    _path(vertical).write_text(yaml.safe_dump(doc, sort_keys=False), encoding="utf-8")
+
+
 def poll(vertical: str) -> list[dict]:
     """Pending events this vertical's playbook actually cares about.
 
@@ -67,6 +81,7 @@ async def watch(vertical: str, on_event, *, interval: float = POLL_SECONDS) -> N
         try:
             for event in poll(vertical):
                 _seen.add(event["id"])
+                _clear_pending(vertical, event["id"])   # one-shot: never replay
                 await on_event(event)
         except asyncio.CancelledError:
             raise

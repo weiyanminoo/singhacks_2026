@@ -13,6 +13,9 @@ trade-offs rather than one obvious winner:
 
 Run: uvicorn vendors.main:app --port 8011
 """
+import os
+import pathlib
+
 from fastapi import FastAPI
 
 app = FastAPI(title="alternate.ai mock suppliers")
@@ -82,6 +85,44 @@ def _make(path: str):
 
 for _path in INVENTORY:
     app.get(_path)(_make(_path))
+
+
+# --- x402 gating (Phase 3) -------------------------------------------------
+# Enabled with X402=1 so the mock path keeps working unchanged. Each endpoint is
+# gated separately because each supplier is paid at its own address — that is
+# the point of machine-to-machine settlement, not one merchant of record.
+if os.getenv("X402") == "1":
+    import json as _json
+
+    from x402_xrpl.server import RequireX402Options, require_x402
+
+    WALLETS = _json.loads((pathlib.Path(__file__).resolve().parent.parent
+                           / "wallets.json").read_text())
+    ROLE_FOR = {
+        "/status/feed": "data_status",
+        "/transport/skyline": "flights_skyline",
+        "/transport/aeroconnect": "flights_aeroconnect",
+        "/lodging/aurora": "hotels_aurora",
+        "/lodging/transit-inn": "hotels_transit_inn",
+        "/lodging/meridian": "hotels_meridian",
+        "/ground/swiftcar": "ground_swiftcar",
+        "/ground/metrolink": "ground_metrolink",
+    }
+    PRICE_DROPS = os.getenv("X402_PRICE_DROPS", "20000")   # 0.02 XRP
+    FACILITATOR = os.getenv("XRPL_FACILITATOR_URL",
+                            "https://xrpl-facilitator-testnet.t54.ai")
+
+    for _p, _role in ROLE_FOR.items():
+        app.middleware("http")(require_x402(RequireX402Options(
+            pay_to=WALLETS[_role]["address"],
+            amount=PRICE_DROPS,
+            asset="XRP",
+            network="xrpl:1",
+            path=_p,
+            source_tag=4021,
+            facilitator_url=FACILITATOR,
+            description=f"alternate.ai discovery query {_p}",
+        )))
 
 
 @app.get("/")

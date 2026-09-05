@@ -57,7 +57,17 @@ class MockAdapter(Adapter):
 
 
 class XrplAdapter(Adapter):
-    """Real settlement on XRPL Testnet. Wired in Phase 3."""
+    """Real settlement on XRPL Testnet.
+
+    Settles in **XRP**, not RLUSD (D-016): the public testnet RLUSD faucet never
+    dispensed anything, so every account holds 0.00 RLUSD. XRP needs no trust
+    line and x402 supports it natively, so the mechanics are identical and the
+    demo stops depending on a faucet we cannot control.
+
+    Discovery still goes over plain HTTP; the x402 402→pay→retry path lands
+    next. Purchases are real: signed, submitted, waited on, with SourceTag and
+    a memo tying the payment to the decision and the policy rule that allowed it.
+    """
 
     name = "xrpl"
 
@@ -65,10 +75,32 @@ class XrplAdapter(Adapter):
         self.asset = asset
 
     async def discover(self, provider: dict, context: dict) -> dict:
-        raise NotImplementedError("Phase 3 — x402 402→pay→retry")
+        # Same source as the mock adapter until the x402 client replaces it.
+        return await MockAdapter().discover(provider, context)
 
     async def purchase(self, provider: dict, option: dict, memo: dict) -> dict:
-        raise NotImplementedError("Phase 3 — RLUSD/XRP Payment with memo")
+        from app import xrpl_ops
+
+        role = provider.get("wallet_role")
+        if not role:
+            raise ValueError(f"provider {provider['id']} has no wallet_role in the registry")
+
+        drops = int(round(float(option["price"]) * 1_000_000))
+        res = await xrpl_ops.pay(
+            "session",
+            xrpl_ops.address(role),
+            drops,
+            asset="XRP",
+            booking_ref=memo.get("booking_ref") or option["id"],
+            decision_id=memo.get("decision_id", ""),
+            rule=memo.get("rule", ""),
+        )
+        return {
+            "ok": True,
+            "tx_hash": res["tx_hash"],
+            "confirmation_code": option["id"].upper(),
+            "simulated": False,
+        }
 
 
 def get(name: str = "mock") -> Adapter:
