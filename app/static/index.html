@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>alternate.ai</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root { --accent: #5eead4; }
+  body { background: #0b0f14; color: #e6edf3; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .row { animation: fade .28s ease-out both; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .bar { transition: width .5s cubic-bezier(.4,0,.2,1); }
+  .num { transition: color .3s; }
+</style>
+</head>
+<body class="min-h-screen">
+<div class="max-w-6xl mx-auto p-6 grid gap-6 md:grid-cols-[1fr_320px]">
+
+  <!-- trace -->
+  <section>
+    <header class="flex items-baseline justify-between mb-4">
+      <h1 class="text-xl font-semibold tracking-tight">alternate.ai</h1>
+      <span id="net" class="mono text-xs text-slate-500">connecting…</span>
+    </header>
+    <div id="trace" class="mono text-[13px] leading-relaxed space-y-1.5"></div>
+    <button id="run" class="mt-6 px-4 py-2 rounded-lg text-sm font-medium bg-teal-300 text-slate-900 hover:bg-teal-200">
+      Run recovery
+    </button>
+  </section>
+
+  <!-- envelope -->
+  <aside class="md:sticky md:top-6 h-fit rounded-xl border border-slate-800 bg-slate-900/40 p-5">
+    <div class="text-xs uppercase tracking-wider text-slate-500">Envelope remaining</div>
+    <div id="remaining" class="num mono text-4xl mt-1 tabular-nums">$10.00</div>
+    <div class="mt-4 h-1.5 rounded-full bg-slate-800 overflow-hidden">
+      <div id="bar" class="bar h-full rounded-full" style="width:100%;background:var(--accent)"></div>
+    </div>
+    <div class="mt-2 flex justify-between text-xs text-slate-500 mono">
+      <span>spent <span id="spent">$0.00</span></span><span id="txcount">0 tx</span>
+    </div>
+    <div class="mt-5 pt-4 border-t border-slate-800">
+      <div class="text-xs uppercase tracking-wider text-slate-500 mb-2">Purchases</div>
+      <div id="purchases" class="space-y-2 text-xs mono text-slate-400">—</div>
+    </div>
+  </aside>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const trace = $("#trace"), purchases = $("#purchases");
+let txCount = 0;
+
+const DOT = { running: "text-amber-400", done: "text-teal-300", rejected: "text-rose-400" };
+const MARK = { running: "○", done: "●", rejected: "✗" };
+
+function upsert(e) {
+  let row = document.getElementById("r-" + e.id);
+  if (!row) {
+    row = document.createElement("div");
+    row.id = "r-" + e.id;
+    row.className = "row flex gap-3";
+    trace.appendChild(row);
+  }
+  const cost = e.cost ? `<span class="text-slate-500 ml-auto shrink-0">${e.cost}</span>` : "";
+  const detail = e.detail ? `<div class="text-slate-500 text-[12px]">${e.detail}</div>` : "";
+  row.innerHTML =
+    `<span class="${DOT[e.status] || "text-slate-500"} shrink-0">${MARK[e.status] || "○"}</span>
+     <div class="min-w-0 flex-1"><div class="${e.status === "rejected" ? "text-rose-300" : ""}">${e.text}</div>${detail}</div>${cost}`;
+  window.scrollTo(0, document.body.scrollHeight);
+}
+
+const es = new EventSource("/stream");
+es.onmessage = ev => {
+  const e = JSON.parse(ev.data);
+  if (e.type === "trace") upsert(e);
+  if (e.type === "envelope") {
+    $("#remaining").textContent = "$" + e.remaining;
+    $("#spent").textContent = "$" + e.spent;
+    $("#bar").style.width = Math.max(0, e.pct * 100) + "%";
+    if (e.pct < 0.35) $("#bar").style.background = "#fbbf24";
+  }
+  if (e.type === "purchase") {
+    txCount++;
+    $("#txcount").textContent = txCount + " tx";
+    if (purchases.textContent === "—") purchases.innerHTML = "";
+    const a = document.createElement("a");
+    a.className = "row flex justify-between gap-2 hover:text-teal-300";
+    a.href = e.explorer_url + e.tx_hash; a.target = "_blank";
+    a.innerHTML = `<span class="truncate">${e.label}</span><span class="text-slate-300 shrink-0">${e.amount}</span>`;
+    purchases.appendChild(a);
+  }
+  if (e.type === "error") upsert({ ...e, id: "err", status: "rejected" });
+};
+
+fetch("/health").then(r => r.json()).then(d => {
+  $("#net").textContent = `testnet · ledger ${d.ledger_index} · fee ${d.base_fee_xrp} XRP`;
+}).catch(() => $("#net").textContent = "node unreachable");
+
+$("#run").onclick = () => { trace.innerHTML = ""; fetch("/demo", { method: "POST" }); };
+</script>
+</body>
+</html>

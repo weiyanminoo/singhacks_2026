@@ -135,6 +135,30 @@ Raw running log. Newest at the bottom. Copy each hash here the moment it lands.
 [HH:MM] <type> <amount> <purpose> <hash>
 ```
 
+### T+1 · Phase 1 verification — payments, memos, tickets, concurrency
+
+All XRP (RLUSD amount type still pending the faucet claim). Every one carries
+`SourceTag: 4021`; the two below also carry a decoded booking memo.
+
+| What | Result | Hash |
+|---|---|---|
+| Payment + SourceTag + Memo (JSON-RPC, smoke test) | tesSUCCESS | `0987438281379084FC0E674EFF7A52D06DA88BB247B1E36FCD147B9506656E6A` |
+| Payment + SourceTag + Memo (WebSocket, after D-014) | tesSUCCESS | `6A073C92E38007BC1820CF51DA7B55230DCCD8383A95FED1878865EFA5F808A8` |
+| `TicketCreate` ×8 → sequences 20492414–20492421 | tesSUCCESS | see account explorer |
+| 3 concurrent ticketed payments | 3/3 tesSUCCESS | `47FB55EC…`, `827D5F10…`, `AF01FE94…` |
+| **7 concurrent ticketed payments (real discovery leg)** | **7/7 tesSUCCESS** | 21.8s JSON-RPC → **9.2s WebSocket** |
+
+**Measured latency** (same work, 7 concurrent ticketed payments):
+
+| Path | Time |
+|---|---|
+| Sequential, JSON-RPC (extrapolated 7 × 13.6s) | ~95s |
+| Concurrent via tickets, JSON-RPC | 21.8s |
+| Concurrent via tickets, WebSocket | **9.2s** |
+
+Ledger close observed at ~2.5s, so the residual is transport, not consensus.
+See D-006a (tickets) and D-014 (transport).
+
 ### T+0 · Phase 0 setup — RLUSD trust lines (9 × TrustSet, all tesSUCCESS)
 
 | Account | Hash |

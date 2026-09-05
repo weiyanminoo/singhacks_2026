@@ -302,6 +302,22 @@ alternate.ai applies wherever four things are true:
      If we fell back to per-account locks, say so plainly and describe tickets as
      the intended design. -->
 
+Measured on testnet, same work (7 concurrent discovery payments):
+
+| Path | Time |
+|---|---|
+| Sequential, JSON-RPC | ~95s (extrapolated from 13.6s/payment) |
+| Concurrent via Tickets, JSON-RPC | 21.8s |
+| Concurrent via Tickets, WebSocket | **9.2s** |
+
+The ledger closes every ~2.5s, so the gap between 21.8s and 9.2s was
+client-side polling, not consensus. Two independent fixes: `TicketCreate`
+pre-allocates sequence numbers so payments need not be serialised
+(D-006a), and a persistent WebSocket removes the HTTP poll loop (D-014).
+Together, roughly a 10x reduction on the leg that dominates the latency
+budget.
+
+
 ### Scalability and reliability
 
 <!-- What breaks at 10,000 concurrent disruptions. Sequence handling per wallet

@@ -195,6 +195,38 @@ Two follow-ons:
    $0.0005. If it does, discovery pricing moves back toward $0.02 and the
    envelope split changes.
 
+### D-014 · WebSocket transport, not JSON-RPC
+**Date/time:** T+1 (Phase 1)
+**Context:** `xrpl_ops` was written against `AsyncJsonRpcClient`. Measuring the real
+discovery leg exposed a problem: 7 concurrent ticketed payments took **21.8s**,
+against a ledger that closes every **~2.5s**. Most of that was client-side
+polling in `submit_and_wait` over HTTP, not consensus. A single sequential
+payment cost 13.6s, which would have made 7 sequential discovery payments alone
+(~95s) blow the entire 90-second story before any LLM call.
+**Decision:** Switch the shared client to `AsyncWebsocketClient`
+(`wss://s.altnet.rippletest.net:51233`), opened lazily via `ensure_open()` and
+held open for the process.
+**Alternatives considered:** Keeping JSON-RPC and not waiting for validation on
+discovery payments (faster, but we would be reporting success before the ledger
+agreed — directly against the "never silently swallow an XRPL error" rule);
+tuning the poll interval (fights the library instead of using the right
+transport).
+**Measured, same work, 7 concurrent ticketed payments:**
+
+| Transport | Time |
+|---|---|
+| JSON-RPC | 21.8s |
+| WebSocket | **9.2s** |
+
+Single payment: 13.6s → 4.6s.
+**Consequence:** Combined with tickets (D-006a) the discovery leg goes from a
+~95s sequential JSON-RPC worst case to **9.2s** — roughly **10x**, and the
+90-second target is comfortable rather than borderline. This is the concrete
+number the README performance section should lead with, and it is a better story
+than either optimisation alone: tickets removed the sequencing constraint, the
+transport removed the polling overhead. Cost: the client is stateful, so
+`ensure_open()` is called at the top of each entry point.
+
 ### D-013 · Cut-list reorder — car booking now cut before providers
 **Date/time:** T+0
 **Context:** D-011 spent cut-list item 1 (escrow) on day one, forced by a protocol
