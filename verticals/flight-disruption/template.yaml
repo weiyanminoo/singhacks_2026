@@ -26,13 +26,20 @@ objective: >
 # Ordered. `depends_on` is what creates the dependency chain: an earlier choice
 # constrains a later one. `needed_when` lets a step be skipped entirely.
 steps:
+  # Constraint keys are "<attribute>_before", "<attribute>_after" or
+  # "max_<attribute>", where <attribute> is a field on the option. The engine
+  # resolves them generically — it has no idea what "checkin" means.
+  #
+  # The dependency chain is the point: the transport choice fixes a departure
+  # time, which bounds when the stay must start, which bounds when the ground
+  # pickup must happen.
   - id: rebook_transport
     category: transport
     required: true
     depends_on: []
     cap_key: transport
     constraints:
-      arrive_before: "{profile.constraints.arrive_by}"
+      arrival_time_before: "{profile.constraints.arrive_by}"
 
   - id: overnight_stay
     category: lodging
@@ -42,7 +49,7 @@ steps:
     cap_key: lodging
     constraints:
       max_distance_km: 15
-      checkin_after: "{rebook_transport.arrival_time}"
+      checkin_before: "{rebook_transport.departure_time}"
 
   - id: ground_transfer
     category: ground
@@ -50,7 +57,7 @@ steps:
     depends_on: [rebook_transport, overnight_stay]
     cap_key: ground
     constraints:
-      pickup_after: "{rebook_transport.arrival_time}"
+      pickup_before: "{rebook_transport.departure_time}"
 
 # --- Discovery ------------------------------------------------------------
 discovery:

@@ -1,32 +1,59 @@
-"""FastAPI app — Phase 1: SSE stream + the UI shell.
+"""FastAPI app — SSE stream, trigger loop, UI.
 
-The agent, registry, policy and scoring arrive in Phase 2/3. This exists so the
-trace panel and envelope are alive and rendering real streamed events, which is
-half of milestone M1.
+The Phase 1 scripted demo has been removed: it hardcoded suppliers and prices,
+which is exactly the domain leak D-015 forbids in `app/`. Runs now come from the
+engine, driven by the trigger loop.
 
-Run:  uvicorn app.main:app --port 8000 --reload
+Run:  uvicorn app.main:app --port 8010 --reload
+      uvicorn vendors.main:app --port 8011
 """
 import asyncio
 import json
+import os
 import pathlib
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, StreamingResponse
 
-from app import xrpl_ops
+from app import engine, profiles, registry, templates, triggers, xrpl_ops
 
 STATIC = pathlib.Path(__file__).resolve().parent / "static"
 
+VERTICAL = os.getenv("VERTICAL", "flight-disruption")
+PROFILE = os.getenv("PROFILE", "traveller-01")
+ADAPTER = os.getenv("EXECUTOR", "mock")
+
 app = FastAPI(title="alternate.ai")
 
-# One queue per connected browser. A run broadcasts to all of them.
 _subscribers: list[asyncio.Queue] = []
+_running = False
 
 
 async def emit(event: dict) -> None:
-    """Push one trace event to every connected browser."""
     for q in list(_subscribers):
         await q.put(event)
+
+
+@app.on_event("startup")
+async def _start_watcher():
+    asyncio.create_task(triggers.watch(VERTICAL, _on_event))
+
+
+async def _on_event(event: dict) -> None:
+    """A trigger fired. Run the recovery, once at a time."""
+    global _running
+    if _running:
+        return
+    _running = True
+    try:
+        await engine.run(event=event, profile_id=PROFILE, vertical=VERTICAL,
+                         emit=emit, adapter_name=ADAPTER)
+    except Exception as exc:
+        await emit({"type": "error", "text": f"Recovery failed: {exc}",
+                    "recovery": "see server logs"})
+        raise
+    finally:
+        _running = False
 
 
 @app.get("/")
@@ -36,13 +63,47 @@ async def index():
 
 @app.get("/health")
 async def health():
-    """Live network values, so the UI can prove it is talking to a real ledger."""
     return await xrpl_ops.network_costs()
+
+
+@app.get("/context")
+async def context():
+    """What the UI needs to describe the current setup, without domain knowledge."""
+    tpl = templates.load(VERTICAL)
+    prof = profiles.load(PROFILE)
+    return {
+        "vertical": VERTICAL,
+        "template": tpl["name"],
+        "verticals_available": templates.available(),
+        "profile": {"id": prof["id"], "name": prof["name"], "org": prof.get("org")},
+        "envelope": prof["envelope"],
+        "notes": profiles.personalisation_notes(prof),
+        "providers": [{"id": p["id"], "name": p["name"], "category": p["category"]}
+                      for p in registry.load(VERTICAL)],
+        "events": [{"id": e["id"], "type": e["type"],
+                    "pending": e.get("pending", False),
+                    "matches": templates.matches(tpl, e)}
+                   for e in triggers.load_events(VERTICAL)],
+        "executor": ADAPTER,
+    }
+
+
+@app.post("/fire/{event_id}")
+async def fire(event_id: str):
+    """Mark an event pending. The loop picks it up — it is still the mechanism."""
+    triggers.fire(VERTICAL, event_id)
+    return {"fired": event_id}
+
+
+@app.post("/reset")
+async def reset():
+    triggers.reset()
+    await emit({"type": "reset"})
+    return {"ok": True}
 
 
 @app.get("/stream")
 async def stream():
-    """Server-Sent Events. One line of JSON per event."""
     q: asyncio.Queue = asyncio.Queue()
     _subscribers.append(q)
 
@@ -50,75 +111,12 @@ async def stream():
         try:
             yield "retry: 2000\n\n"
             while True:
-                event = await q.get()
-                yield f"data: {json.dumps(event)}\n\n"
+                yield f"data: {json.dumps(await q.get())}\n\n"
         finally:
             if q in _subscribers:
                 _subscribers.remove(q)
 
     return StreamingResponse(
-        gen(),
-        media_type="text/event-stream",
+        gen(), media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
-
-
-@app.post("/demo")
-async def demo():
-    """Phase 1 only: drive the panel with a scripted sequence.
-
-    Proves events render and the envelope animates. Phase 3 replaces this with
-    the real agent run.
-    """
-    asyncio.create_task(_demo_run())
-    return {"started": True}
-
-
-async def _demo_run() -> None:
-    envelope = 10.00
-    spent = 0.0
-
-    async def envelope_event():
-        await emit({"type": "envelope", "remaining": f"{envelope - spent:.2f}",
-                    "spent": f"{spent:.2f}", "pct": (envelope - spent) / envelope})
-
-    await emit({"type": "trace", "id": "t0", "text": "Disruption detected — SQ0842 SIN→CGK cancelled",
-                "detail": "Meeting 09:00 Jakarta · envelope $10.00", "cost": None, "status": "done"})
-    await envelope_event()
-    await asyncio.sleep(0.4)
-
-    providers = [
-        ("Skyline Air", "flights"), ("AeroConnect", "flights"), ("Status Feed", "data"),
-        ("Aurora Grand", "hotels"), ("Transit Inn", "hotels"), ("Meridian", "hotels"),
-        ("SwiftCar", "ground"),
-    ]
-    for i, (name, cap) in enumerate(providers):
-        await emit({"type": "trace", "id": f"q{i}", "text": f"Querying {name}",
-                    "detail": cap, "cost": "$0.02", "status": "running"})
-        await asyncio.sleep(0.25)
-        spent += 0.02
-        await emit({"type": "trace", "id": f"q{i}", "text": f"Queried {name}",
-                    "detail": cap, "cost": "$0.02", "status": "done"})
-        await envelope_event()
-
-    await emit({"type": "trace", "id": "skip", "text": "Declined to query MetroLink",
-                "detail": "best option has 2 rooms left · 8th query not worth the delay",
-                "cost": None, "status": "rejected"})
-    await asyncio.sleep(0.4)
-    await emit({"type": "trace", "id": "rej", "text": "Rejected Aurora Grand — $7.75",
-                "detail": "meets every criterion except the $6.25 hotel cap",
-                "cost": None, "status": "rejected"})
-    await asyncio.sleep(0.4)
-
-    for label, amount in [("Seat SQ0842 06:40", 4.60), ("Room, 1 night", 1.95),
-                          ("Airport transfer", 0.49)]:
-        spent += amount
-        await emit({"type": "purchase", "label": label, "amount": f"${amount:.2f}",
-                    "tx_hash": "STUB" + "0" * 60,
-                    "explorer_url": "https://testnet.xrpl.org/transactions/"})
-        await envelope_event()
-        await asyncio.sleep(0.3)
-
-    await emit({"type": "trace", "id": "done", "text": "Recovery complete",
-                "detail": f"3 purchases · ${spent:.2f} of ${envelope:.2f}",
-                "cost": None, "status": "done"})
