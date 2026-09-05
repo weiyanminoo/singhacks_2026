@@ -411,20 +411,38 @@ python scripts/setup_wallets.py accounts
 Creates 10 Testnet accounts (treasury, organizer session, 8 suppliers), funds each
 with 100 XRP, and writes `wallets.json` — gitignored, never committed.
 
-**2 · Start the supplier app**, with x402 gating enabled:
+**2 · Start the supplier app**, with x402 gating enabled.
+
+`X402=1` is what turns on payment gating — without it the `/verify` endpoints
+answer for free and there is no 402 challenge and no payment.
 
 ```bash
 X402=1 python -m uvicorn vendors.main:app --port 8011
 ```
 
-**3 · Start ContingencyOS** with real XRPL settlement, in a second terminal:
+```powershell
+# PowerShell has no inline env-var prefix
+$env:X402="1"; python -m uvicorn vendors.main:app --port 8011
+```
+
+**3 · Start ContingencyOS** with real XRPL settlement, **in a second terminal**.
+
+Both servers run in the foreground and must stay running — the first will block
+the second if you try to run them in one terminal.
 
 ```bash
 EXECUTOR=xrpl python -m uvicorn app.main:app --port 8010
 ```
 
-Use `EXECUTOR=mock` for an instant run with no ledger activity — useful for
-reading the decision logic without waiting for settlement.
+```powershell
+$env:EXECUTOR="xrpl"; python -m uvicorn app.main:app --port 8010
+```
+
+`EXECUTOR=xrpl` settles for real on Testnet. Use `EXECUTOR=mock` for an instant
+run with fake hashes and no ledger activity — useful for reading the decision
+logic without waiting ~2.5 minutes for settlement.
+
+Each server is up when it prints `Uvicorn running on http://127.0.0.1:80xx`.
 
 **4 · Open** http://localhost:8010 and click **Run full demo**.
 
