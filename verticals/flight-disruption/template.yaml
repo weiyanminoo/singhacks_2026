@@ -1,0 +1,83 @@
+# Contingency playbook — flight disruption.
+#
+# This file is the ONLY place flight knowledge lives. The engine reads it
+# generically: it does not know what "transport" or "lodging" mean, only that a
+# step needs a resource of some category, that some steps depend on others, and
+# that constraints must hold. Adding an industry means adding a file like this.
+#
+# See docs/00-decisions.md D-015.
+
+id: flight-disruption
+name: Flight disruption recovery
+version: 1
+
+# --- When this playbook applies -------------------------------------------
+triggers:
+  - event_type: transport.cancelled
+  - event_type: transport.delayed
+    when: "payload.delay_minutes >= 180"
+
+objective: >
+  Get {profile.name} to {event.payload.destination} in time for
+  {profile.constraints.commitment}, within the spend envelope and all hard
+  constraints.
+
+# --- What recovery looks like ---------------------------------------------
+# Ordered. `depends_on` is what creates the dependency chain: an earlier choice
+# constrains a later one. `needed_when` lets a step be skipped entirely.
+steps:
+  - id: rebook_transport
+    category: transport
+    required: true
+    depends_on: []
+    cap_key: transport
+    constraints:
+      arrive_before: "{profile.constraints.arrive_by}"
+
+  - id: overnight_stay
+    category: lodging
+    required: false
+    depends_on: [rebook_transport]
+    needed_when: "rebook_transport.departs_next_day"
+    cap_key: lodging
+    constraints:
+      max_distance_km: 15
+      checkin_after: "{rebook_transport.arrival_time}"
+
+  - id: ground_transfer
+    category: ground
+    required: false
+    depends_on: [rebook_transport, overnight_stay]
+    cap_key: ground
+    constraints:
+      pickup_after: "{rebook_transport.arrival_time}"
+
+# --- Discovery ------------------------------------------------------------
+discovery:
+  categories: [status, transport, lodging, ground]
+  price_per_query: "0.02"
+  max_queries: 7          # registry holds 8; the agent declines one on purpose
+
+# --- Spending controls ----------------------------------------------------
+# Demo runs at 1/40 scale on real RLUSD (D-009); discovery is unscaled (D-012).
+caps:
+  envelope: "10.00"
+  approval_threshold: "3.75"
+  per_category:
+    transport: "6.00"
+    lodging: "6.25"
+    ground: "1.00"
+
+# --- Deterministic scoring ------------------------------------------------
+# Python computes these. The LLM never does arithmetic.
+scoring:
+  weights:
+    constraint_fit: 0.50
+    cost: 0.30
+    reliability: 0.20
+  # Profile facts that adjust a score, and by how much. This is where
+  # personalisation becomes visible and explainable rather than vibes.
+  preference_bonus:
+    preferred_suppliers: 0.10
+    avoid_suppliers: -0.25
+    repeat_choice_in_history: 0.05

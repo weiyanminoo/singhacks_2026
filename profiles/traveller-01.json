@@ -1,0 +1,38 @@
+{
+  "id": "traveller-01",
+  "name": "W. Oo",
+  "org": "Northwind Consulting",
+  "envelope": {
+    "limit": "10.00",
+    "asset": "RLUSD"
+  },
+  "constraints": {
+    "commitment": "client meeting, 09:00 Jakarta",
+    "arrive_by": "2026-09-06T08:00:00+07:00",
+    "max_transfer_minutes": 25,
+    "requires_step_free_access": false
+  },
+  "preferences": {
+    "avoid_red_eye": true,
+    "preferred_suppliers": ["Skyline Air"],
+    "avoid_suppliers": ["MetroLink"],
+    "lodging_near": "airport",
+    "notes": "Has been burned by low-reliability ground operators before."
+  },
+  "history": [
+    {
+      "at": "2026-07-14",
+      "event": "transport.cancelled",
+      "chose": "Transit Inn",
+      "over": "Aurora Grand",
+      "because": "within lodging cap; Aurora exceeded it"
+    },
+    {
+      "at": "2026-05-02",
+      "event": "transport.delayed",
+      "chose": "SwiftCar",
+      "over": "MetroLink",
+      "because": "MetroLink no-showed once; flagged unreliable"
+    }
+  ]
+}

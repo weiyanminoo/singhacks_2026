@@ -108,78 +108,77 @@ their source.
 
 ---
 
-## Phase 2 — The paid loop (T+3 → T+7)
+## Phase 2 — The contingency engine (T+3 → T+8) · THE MVP
 
-**Person A**
-- [ ] `vendors/main.py`: one FastAPI app, data-driven handlers, routers for
-      `/flights/skyline`, `/hotels/aurora`, `/data/status`
-- [ ] x402-gate them via **`x402-xrpl`** (not `x402-secure` — different packages,
-      D-010), **priced in RLUSD at $0.02/call** (D-012 — the real price, not
-      scaled). **If the facilitator enforces a minimum above $0.02: STOP AND ASK.**
-      Do not pick a fallback unilaterally.
-- [ ] `x402_client.py`: real 402 challenge → pay → retry
-- [ ] Free tier on data endpoints returns schema + stale sample; paid returns live
+**This is the product.** Everything here is domain-neutral (D-015). No flight
+logic in `app/`.
 
-**Person B**
-- [ ] `registry.py`: **8 providers** (2 flight, 3 hotel, 2 ground, 1 status/waiver)
-      with id, capability, endpoint, price, reliability
-- [ ] `agent.py`: objective parsing → provider selection → query loop
+**Data first — the domain, as files**
+- [ ] `verticals/flight-disruption/template.yaml`: trigger conditions, required
+      resource categories, ordered recovery steps with slots, constraint schema,
+      default caps
+- [ ] `verticals/flight-disruption/registry.yaml`: the 8 providers
+      (2 flight, 3 hotel, 2 ground, 1 status/waiver) — id, capability, endpoint,
+      price, reliability
+- [ ] `verticals/flight-disruption/events.yaml`: mock feed the trigger loop polls
+- [ ] `profiles/traveller-01.json`: preferences, budget, hard constraints, history
+
+**Engine — no domain knowledge**
+- [ ] `templates.py`: load + validate playbooks; fail loudly on a bad schema
+- [ ] `profiles.py`: load/save profile; append decisions to history
+- [ ] `registry.py`: resources from the vertical's data file, never hardcoded URLs
+- [ ] `scoring.py`: deterministic constraint scoring
 - [ ] `policy.py`: per-tx cap, category cap, envelope cap, approval threshold,
       duplicate-purchase guard
-- [ ] `scoring.py`: deterministic constraint scoring
+- [ ] `engine.py`: match template → expand with profile → plan → score → act
+- [ ] `executor.py`: adapter interface + `mock` adapter (instant, no ledger)
+- [ ] `triggers.py`: polling loop over a pluggable source + manual fire endpoint
+- [ ] `vendors/main.py`: 8 mock providers, plain HTTP for now (x402 in Phase 3)
+- [ ] Personalisation is **visible in the trace** — say which profile fact drove
+      which choice, or the selling point is invisible
 
-### ✅ MILESTONE M2 (T+7)
-**The agent picks a provider from the registry, receives a 402, pays on XRPL, and
-gets live data back.** The commercial loop exists in miniature.
+### ✅ MILESTONE M2 (T+8) — THE ONE THAT MATTERS NOW
+**An event fires from the loop, the engine matches a template, personalises it
+from the profile, and executes a full recovery — streamed to the UI end to end.**
+A working product, with payments still mocked.
 
-*If M2 slips past T+8: cut items 1 and 2 from the cut list immediately.*
+*If M2 slips past T+9: cut the next cut-list item immediately.*
 
-**Write:** `docs/phase-2-x402-loop.md` — the exact 402 challenge and response
-shape observed, facilitator setup and pinned version, per-call latency measured,
-the free-tier pattern, the registry schema.
-**README:** *x402 usage*, *Agentic transaction flow*, *Starter Kit integration*.
+**Write:** `docs/phase-2-engine.md` — the template schema and why it is shaped
+that way, how matching works, what the LLM decides vs what Python decides, how
+personalisation enters the plan, an annotated trace.
+**README:** *How the agent creates value*, *Architecture*, *Reachability* (the
+engine shape IS the argument).
 
 ---
 
-## Phase 3 — The full journey (T+7 → T+11)
+## Phase 3 — XRPL + x402, thin but real (T+8 → T+11)
 
-**Person A**
-- [ ] Remaining 5 vendor routers with genuinely different price/inventory/latency
-      (8 total)
-- [ ] ~~Escrow round-trip~~ — **CUT at T+0 (D-011).** The testnet RLUSD issuer does
-      not set `lsfAllowTrustLineLocking`, so token escrow is unavailable. Build the
-      **vendor-initiated refund `Payment`** instead: vendor returns the RLUSD to
-      the session wallet, agent reroutes. Do not build `EscrowCreate`/`Finish`/
-      `Cancel`.
-- [ ] `SetRegularKey` on the session wallet
-- [ ] `receipts.py`: JSON ledger mapping tx_hash ↔ decision_id ↔ policy_rule ↔ booking_ref
+The engine already works. This makes the money real without touching engine logic.
 
-**Person B**
-- [ ] **The dependency chain** — this is the centrepiece:
-      flight time decided → constrains hotel choice → constrains car timing
-- [ ] Search-vs-commit decision: the agent explicitly reasons about whether one
-      more $0.02 query is worth the time given decaying inventory. **This is the
-      8th registered provider being declined** — a real registry entry the agent
-      evaluates and turns down, visible in the trace with the stated reason.
-      Decide here which of the 8 it is, from the run.
-- [ ] At least one **rejected** option shown with the reason
-      (e.g. "$7.75 Aurora Grand meets all criteria but breaks the $6.25 cap")
-- [ ] `/approve` page: pending approval, two buttons, resolves the block
-- [ ] Explorer links rendered inline next to each purchase in the UI
-- [ ] Reset button
+- [ ] `executor.py`: `xrpl` adapter alongside `mock` — same interface, so the
+      engine cannot tell the difference
+- [ ] x402-gate the vendor endpoints via **`x402-xrpl`** (D-010), **priced in
+      RLUSD at $0.02/call** (D-012). **If the facilitator enforces a minimum
+      above $0.02: STOP AND ASK.**
+- [ ] `x402_client.py`: real 402 challenge → pay → retry, replacing the stub
+- [ ] Free tier on data endpoints returns schema + stale sample; paid returns live
+- [ ] Discovery leg uses pre-allocated tickets (D-006a) over WebSocket (D-014)
+- [ ] `receipts.py`: tx_hash ↔ decision_id ↔ policy_rule ↔ booking_ref
+- [ ] The outstanding **RLUSD-denominated payment** finally lands here
+- [ ] Explorer links inline next to each purchase in the UI
 
-### ✅ MILESTONE M3 (T+11) — THE CRITICAL ONE
-**The full happy path runs start to finish in under 2 minutes:** cancellation →
-7 discovery payments (8th provider declined, visibly) → dependent decisions →
-3 purchases → confirmations → envelope drained → all hashes visible and clickable.
+### ✅ MILESTONE M3 (T+11)
+**The same run as M2, settling on XRPL.** Hashes visible and clickable, envelope
+drains for real, memos tie each payment to the decision that caused it.
 
-*If M3 slips past T+12: cut items 3 and 4, go straight to Phase 5.*
+*If M3 slips past T+12: keep the mock executor for the demo, show the XRPL
+transactions we already have, and be explicit about it in the README.*
 
-**Write:** `docs/phase-3-agent-decisions.md` — the scoring function and its
-weights, how the dependency chain is sequenced, the search-vs-commit heuristic,
-what the LLM decides vs what Python decides, a full annotated trace from one run.
-**README:** *How the agent creates value* (paste a real trace), *Customer
-journey*, *Architecture*, *Transaction hashes* table.
+**Write:** `docs/phase-3-xrpl-x402.md` — the 402 challenge shape observed,
+facilitator setup and pinned version, per-call latency measured, the adapter
+boundary.
+**README:** *x402 usage*, *Agentic transaction flow*, *Transaction hashes*.
 
 ---
 

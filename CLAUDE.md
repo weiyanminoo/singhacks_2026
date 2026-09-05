@@ -6,22 +6,46 @@ Read this before doing anything. Re-read `PLAN.md` before starting any new phase
 
 ## What we are building
 
-**alternate.ai** — an autonomous disruption recovery agent.
+**alternate.ai** — an autonomous **contingency management engine**.
 
 > In aviation, the *alternate* is the backup airport you are required to nominate
 > before you take off. A fallback designated in advance, funded in advance. That
 > is exactly the product.
 
-A traveller (or their employer) sets a **spend envelope** before a trip: a fixed
-budget with rules attached. When their plan breaks — flight cancelled at 11pm —
-an AI agent pays for live availability data across several providers, decides on
-a recovery plan under hard constraints, and **buys the fix itself** in ~90
-seconds. No human in the loop for in-policy spend.
+An organisation sets a **contingency profile** in advance: preferences, a spend
+envelope, hard constraints. A **trigger loop** watches for events that break the
+plan. When one fires, the agent matches it against a **template library** of
+recovery playbooks, expands the chosen template with that user's profile and
+history, pays for live availability across several providers, decides under hard
+constraints, and **buys the fix itself**. No human in the loop for in-policy spend.
+
+**The engine is domain-neutral (D-015).** Flight cancellation is one instance of a
+general shape: an event breaks a plan, there is a short window, the fix means
+buying from several unrelated parties under hard constraints. Logistics reroutes,
+disaster-relief procurement and venue cancellations are the same shape.
+
+**We build exactly one vertical: flight disruption.** Other industries are
+described in the pitch and README, never implemented. That is honest *only*
+because the engine has no flight-specific logic in it — a vertical is three data
+files. See the scope rule below.
 
 Demo scenario: cancelled flight SIN→CGK with a 09:00 meeting in Jakarta.
 
-**One-line pitch:** a recovery agent that fixes broken plans by buying the fix,
-inside a spending envelope you approved in advance.
+**One-line pitch:** a contingency engine that fixes broken plans by buying the
+fix, inside a spending envelope you approved in advance.
+
+### The claim discipline that keeps this honest
+
+Because we build one vertical but claim generality, the claim is **architectural,
+not demonstrated**. Two rules follow, and they are not negotiable:
+
+- ✅ "Adding a vertical is a data file — here is the engine, with no flight code in it."
+- ❌ "We support logistics and healthcare."
+
+If flight-specific logic ever leaks into `engine.py`, `scoring.py`, `policy.py` or
+`templates.py`, the Reachability claim becomes unsupported and we have broken our
+own rule that no README claim may outrun the repo. A reviewer can check this by
+reading one file. Keep it true.
 
 ### Why it needs autonomous payments (the thesis — protect this in every design choice)
 
@@ -214,6 +238,28 @@ Browser (index.html)                    Phone/2nd tab (/approve)
                  └────────────────────┘
 ```
 
+### Engine shape (D-015) — the domain lives in data, not code
+
+```
+  Event sources            Profile store          Template library
+  poll · webhook · manual   profiles/*.json        verticals/*/template.yaml
+         \                       |                      /
+          +----------> Trigger evaluator <-------------+
+                              |
+                     Contingency Engine          ← NO domain logic here
+              match template → plan → score → act
+                              |
+         +--------------------+--------------------+
+         |                    |                    |
+     Registry            Policy/caps            Executor
+   (resources for      (budget, approval)    adapters: mock | xrpl
+    this vertical)                                   |
+                              SSE trace → UI
+```
+
+Swapping industry = swapping data files, zero code change. That property *is* the
+Reachability argument, so protect it.
+
 ### Layout
 
 ```
@@ -224,21 +270,35 @@ singhacks_2026/
 │   ├── README.md            index + conventions + templates
 │   ├── 00-decisions.md      running decision log
 │   └── phase-N-*.md         one per phase
-├── app/
-│   ├── main.py          FastAPI: SSE stream, run trigger, approval endpoints
-│   ├── agent.py         orchestrator: plan → discover → decide → buy
-│   ├── policy.py        caps, approval thresholds, duplicate guard
-│   ├── registry.py      provider registry (discovery happens HERE, not hardcoded URLs)
+├── app/                 ← NO domain logic anywhere in here
+│   ├── main.py          FastAPI: SSE stream, trigger + approval endpoints
+│   ├── engine.py        orchestrator: match template → plan → score → act
+│   ├── templates.py     load + validate playbook files
+│   ├── profiles.py      user profile: preferences, constraints, history
+│   ├── triggers.py      polling loop over a pluggable event source + manual fire
+│   ├── registry.py      resource registry, loaded from the vertical's data file
 │   ├── scoring.py       DETERMINISTIC constraint scoring
+│   ├── policy.py        caps, approval thresholds, duplicate guard
+│   ├── executor.py      adapters: mock | xrpl
 │   ├── wallet.py        session wallet, treasury, balances
 │   ├── xrpl_ops.py      payment / refund / memo helpers
 │   ├── x402_client.py   402 challenge handling
 │   ├── receipts.py      receipt ledger (tx ↔ decision ↔ policy rule)
 │   └── static/index.html
+├── verticals/           ← ALL domain knowledge lives here
+│   └── flight-disruption/
+│       ├── template.yaml    recovery playbook: steps, slots, constraints
+│       ├── registry.yaml    the 8 providers for this domain
+│       └── events.yaml      mock event feed the trigger loop polls
+├── profiles/            traveller-01.json — preferences, budget, history
 ├── vendors/main.py      ALL 8 mock providers, one app, x402-gated routers
-├── tests/               test_policy.py, test_scoring.py
+├── tests/               test_policy.py, test_scoring.py, test_templates.py
 └── scripts/setup_wallets.py
 ```
+
+**The test that keeps D-015 honest:** grep `app/` for "flight", "hotel", "airport".
+If it hits anything outside a comment, domain logic has leaked and the
+Reachability claim is no longer true.
 
 **One vendor app with eight routers. Not eight services.** Data-driven handlers,
 so extra providers are nearly free.

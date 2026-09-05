@@ -195,6 +195,41 @@ Two follow-ons:
    $0.0005. If it does, discovery pricing moves back toward $0.02 and the
    envelope split changes.
 
+### D-015 · Pivot — generic contingency engine, domain lives in data
+**Date/time:** T+3
+**Context:** The product was a flight-disruption recovery agent. Two problems: it
+is one vertical, and Reachability (20% of the grade) was asserted in prose rather
+than shown. The insight is that flight cancellation is one instance of a general
+shape — an event breaks a plan, there is a short window, the fix means buying
+from several unrelated parties under hard constraints. Logistics reroutes,
+disaster-relief procurement and venue cancellations are the same shape.
+**Decision:** Rebuild as a **domain-neutral contingency engine**. The engine
+contains **no flight-specific logic**. A vertical is three data files:
+
+| File | Holds |
+|---|---|
+| `verticals/<name>/template.yaml` | trigger conditions, required resource categories, ordered recovery steps with slots, constraint schema, default caps |
+| `verticals/<name>/registry.yaml` | providers/resources available in that domain |
+| `profiles/<id>.json` | preferences, budget, hard constraints, decision history |
+
+Adds three capabilities the old design lacked: an **always-on event trigger**
+(polling loop over a pluggable source, plus manual fire for the demo), a
+**persistent user profile** driving personalisation, and a **template library**
+the agent matches an event against and then expands with that user's specifics.
+**Alternatives considered:** Keeping the single vertical (leaves Reachability
+unevidenced); building 2–3 verticals fully (roughly doubles the work for a
+demo that only shows one at a time).
+**Consequence:** **Only the flight vertical is built.** Other industries are
+described in the pitch and README, not implemented. That makes the
+industry-agnostic claim *architectural rather than demonstrated*, which is
+acceptable **only if the engine genuinely contains no domain logic** — otherwise
+the claim is unsupported and violates our own rule that no README claim may
+outrun what the repo shows. So the honest phrasing is "adding a vertical is a
+data file, and here is the engine with no flight code in it", never "we support
+logistics and healthcare". A reviewer can verify that by reading `engine.py`.
+Cheap future option, not taken now: ship a second unrun `template.yaml` as
+evidence the schema generalises.
+
 ### D-014 · WebSocket transport, not JSON-RPC
 **Date/time:** T+1 (Phase 1)
 **Context:** `xrpl_ops` was written against `AsyncJsonRpcClient`. Measuring the real

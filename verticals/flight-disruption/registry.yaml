@@ -1,0 +1,70 @@
+# Resource registry for the flight-disruption vertical.
+#
+# Discovery happens HERE, not from hardcoded URLs in the engine. The agent picks
+# which of these to pay for. 8 registered, 7 queried, 1 declined on purpose
+# (D-004a) — the decline is the search-vs-commit moment.
+
+providers:
+  - id: status_feed
+    name: Status Feed
+    category: status
+    endpoint: /status/feed
+    price: "0.02"
+    reliability: 0.99
+    wallet_role: data_status
+
+  - id: skyline
+    name: Skyline Air
+    category: transport
+    endpoint: /transport/skyline
+    price: "0.02"
+    reliability: 0.94
+    wallet_role: flights_skyline
+
+  - id: aeroconnect
+    name: AeroConnect
+    category: transport
+    endpoint: /transport/aeroconnect
+    price: "0.02"
+    reliability: 0.88
+    wallet_role: flights_aeroconnect
+
+  - id: aurora
+    name: Aurora Grand
+    category: lodging
+    endpoint: /lodging/aurora
+    price: "0.02"
+    reliability: 0.96
+    wallet_role: hotels_aurora
+
+  - id: transit_inn
+    name: Transit Inn
+    category: lodging
+    endpoint: /lodging/transit-inn
+    price: "0.02"
+    reliability: 0.91
+    wallet_role: hotels_transit_inn
+
+  - id: meridian
+    name: Meridian
+    category: lodging
+    endpoint: /lodging/meridian
+    price: "0.02"
+    reliability: 0.89
+    wallet_role: hotels_meridian
+
+  - id: swiftcar
+    name: SwiftCar
+    category: ground
+    endpoint: /ground/swiftcar
+    price: "0.02"
+    reliability: 0.93
+    wallet_role: ground_swiftcar
+
+  - id: metrolink
+    name: MetroLink
+    category: ground
+    endpoint: /ground/metrolink
+    price: "0.02"
+    reliability: 0.72
+    wallet_role: ground_metrolink

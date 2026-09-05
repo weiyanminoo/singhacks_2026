@@ -1,0 +1,34 @@
+# Mock event feed the trigger loop polls.
+#
+# `pending: true` means the loop will pick it up on its next poll. The demo's
+# "fire event" button flips one of these, so a run can be triggered on cue while
+# the loop stays the real mechanism. Swap this source for a webhook or a real
+# operational feed without touching the engine.
+
+events:
+  - id: evt-001
+    type: transport.cancelled
+    pending: true
+    at: "2026-09-05T21:04:00+08:00"
+    subject: traveller-01
+    payload:
+      supplier: Skyline Air
+      reference: SQ0842
+      origin: SIN
+      destination: CGK
+      scheduled_departure: "2026-09-05T22:15:00+08:00"
+      reason: technical
+      rebooking_window_minutes: 15
+
+  # Not pending — present to show the trigger evaluates conditions, not just
+  # event type. delay_minutes is under the 180 threshold in template.yaml, so
+  # this one is correctly ignored.
+  - id: evt-002
+    type: transport.delayed
+    pending: false
+    at: "2026-09-05T19:40:00+08:00"
+    subject: traveller-01
+    payload:
+      supplier: AeroConnect
+      reference: AC1190
+      delay_minutes: 45
