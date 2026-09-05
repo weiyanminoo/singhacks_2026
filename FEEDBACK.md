@@ -30,6 +30,26 @@ At T+22, clean this into constructive points and submit the form.
 
 <!-- Add entries below as you hit them. Do not wait until the end. -->
 
+### [T+1] `submit_and_wait` over JSON-RPC costs ~3x the ledger, and nothing says so
+**Area:** xrpl-py
+**What happened:** A single `submit_and_wait` over `AsyncJsonRpcClient` took
+**13.6s** against a testnet ledger closing every **~2.5s**. Seven concurrent
+ticketed payments took 21.8s; the identical code on `AsyncWebsocketClient` took
+**9.2s**, and a single payment dropped to 4.6s. So roughly two thirds of our
+settlement latency was client-side polling, not consensus. Nothing in the docs or
+the client's own docstrings indicates that transport choice carries a ~3x latency
+penalty — both clients are presented as interchangeable, and JSON-RPC is the one
+most quickstarts reach for because it needs no connection lifecycle.
+**Time lost:** ~40 min, and we nearly shipped a design that would have blown a
+90-second latency budget on polling overhead.
+**What would have helped:** say plainly in the xrpl-py client docs that
+`submit_and_wait` polls on JSON-RPC and should not be used on a latency budget,
+and that WebSocket is the right transport for anything submitting more than a
+couple of transactions. A one-line note on the client comparison page would do
+it. The deeper point for agentic work: agents submit many small transactions, so
+per-transaction overhead dominates in a way it does not for human-paced wallets —
+worth its own note in the agent/payments guidance.
+
 ### [T+0] Testnet RLUSD faucet caps at 10 RLUSD/24h behind GitHub OAuth
 **Area:** RLUSD
 **What happened:** tryrlusd.com is the only testnet RLUSD faucet the docs point
